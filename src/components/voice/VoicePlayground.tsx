@@ -139,7 +139,7 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
               Stop
             </Button>
           ) : (
-            <Button variant="playful" onClick={start} disabled={isConnecting}>
+            <Button variant="hero" onClick={start} disabled={isConnecting}>
               <Mic className="h-4 w-4" />
               {isConnecting ? "Connecting…" : "Start"}
             </Button>

@@ -65,10 +65,13 @@ export default {
       backgroundImage: {
         "hero": "var(--gradient-hero)",
         "mesh": "var(--gradient-mesh)",
+        "gradient-card": "var(--gradient-card)",
+        "gradient-glow": "var(--gradient-glow)",
       },
       boxShadow: {
         pop: "var(--shadow-pop)",
         glow: "var(--shadow-glow)",
+        card: "var(--shadow-card)",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -77,35 +80,32 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
-        floaty: {
-          "0%, 100%": { transform: "translate3d(0, 0, 0)" },
-          "50%": { transform: "translate3d(0, -6px, 0)" },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-12px)" },
         },
-        wobble: {
-          "0%, 100%": { transform: "translate3d(0,0,0) rotate(0deg)" },
-          "50%": { transform: "translate3d(0,-2px,0) rotate(1deg)" },
+        "pulse-glow": {
+          "0%, 100%": { boxShadow: "0 0 40px -10px hsl(180 100% 50% / 0.3)" },
+          "50%": { boxShadow: "0 0 60px -5px hsl(180 100% 50% / 0.5)" },
+        },
+        "orb-breathe": {
+          "0%, 100%": { transform: "scale(1)", opacity: "0.8" },
+          "50%": { transform: "scale(1.08)", opacity: "1" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        floaty: "floaty 6s ease-in-out infinite",
-        wobble: "wobble 10s ease-in-out infinite",
+        float: "float 6s ease-in-out infinite",
+        "pulse-glow": "pulse-glow 3s ease-in-out infinite",
+        "orb-breathe": "orb-breathe 4s ease-in-out infinite",
       },
     },
   },

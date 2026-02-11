@@ -195,7 +195,7 @@ export default function VoiceAgentStudio() {
               <Plus className="h-4 w-4" />
               New
             </Button>
-            <Button variant="playful" size="sm" onClick={saveAssistant} disabled={loading || !activeId}>
+            <Button variant="hero" size="sm" onClick={saveAssistant} disabled={loading || !activeId}>
               <Save className="h-4 w-4" />
               Save
             </Button>
@@ -325,7 +325,7 @@ export default function VoiceAgentStudio() {
             </CardContent>
             <CardFooter className="justify-between">
               <p className="text-xs text-muted-foreground">Tip: Save, then start the playground.</p>
-              <Button variant="playful" size="sm" onClick={saveAssistant} disabled={loading || !activeId}>
+              <Button variant="hero" size="sm" onClick={saveAssistant} disabled={loading || !activeId}>
                 <Save className="h-4 w-4" />
                 Save
               </Button>

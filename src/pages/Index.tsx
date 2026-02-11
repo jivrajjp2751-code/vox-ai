@@ -1,208 +1,334 @@
 import { Link } from "react-router-dom";
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
-import { useMemo, useRef } from "react";
+import { motion } from "framer-motion";
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Mic, Wand2, PlugZap, Rocket, Sparkles } from "lucide-react";
+import {
+  Mic,
+  Wand2,
+  PlugZap,
+  Rocket,
+  Sparkles,
+  Bot,
+  AudioWaveform,
+  Globe,
+  Zap,
+  Shield,
+  ArrowRight,
+} from "lucide-react";
+
+const features = [
+  {
+    icon: Bot,
+    title: "Custom AI Agents",
+    desc: "Build voice assistants with custom personalities, prompts, and behaviors tailored to your use case.",
+  },
+  {
+    icon: AudioWaveform,
+    title: "Natural Voices",
+    desc: "Choose from premium voice models with adjustable tone, speed, and emotion for lifelike conversations.",
+  },
+  {
+    icon: PlugZap,
+    title: "Tool Calling",
+    desc: "Connect webhooks, APIs, and CRMs. Let your assistant take actions during live conversations.",
+  },
+  {
+    icon: Zap,
+    title: "Ultra-Low Latency",
+    desc: "Sub-second response times with streaming audio and real-time WebSocket connections.",
+  },
+  {
+    icon: Globe,
+    title: "Multi-Language",
+    desc: "Deploy assistants in 30+ languages with automatic detection and seamless switching.",
+  },
+  {
+    icon: Shield,
+    title: "Enterprise Ready",
+    desc: "SOC2 compliant, end-to-end encryption, and role-based access for production deployments.",
+  },
+];
 
 const steps = [
   {
-    title: "Create your assistant",
-    desc: "Start from a template or craft a prompt from scratch — names, goals, guardrails, and tone.",
+    num: "01",
+    title: "Create Your Assistant",
+    desc: "Define your agent's persona, system prompt, and conversation style in our intuitive builder.",
     icon: Wand2,
   },
   {
-    title: "Customize voice & behavior",
-    desc: "Pick a voice, tune style, and define how your agent handles interruptions and handoffs.",
+    num: "02",
+    title: "Configure Voice & Behavior",
+    desc: "Select a voice, set the tone, adjust temperature, and fine-tune how your assistant responds.",
     icon: Sparkles,
   },
   {
-    title: "Connect tools & APIs",
-    desc: "Toggle actions like webhooks, CRM updates, or knowledge lookups — without rewriting your UI.",
+    num: "03",
+    title: "Connect Tools & APIs",
+    desc: "Wire up webhooks, databases, and external services so your assistant can take real actions.",
     icon: PlugZap,
   },
   {
-    title: "Deploy anywhere",
-    desc: "Embed your agent in sites, apps, and support flows. Ship improvements instantly.",
+    num: "04",
+    title: "Deploy Anywhere",
+    desc: "Push to production with a single click. Embed via SDK, phone number, or web widget.",
     icon: Rocket,
   },
-] as const;
+];
 
-function useHeroPointerGlow() {
-  const reduce = useReducedMotion();
-  return useMemo(() => {
-    if (reduce) return {} as React.CSSProperties;
-    return {
-      // Updated via CSS vars in mouse move handler
-      background:
-        "radial-gradient(420px 240px at var(--px, 50%) var(--py, 30%), hsl(var(--primary) / 0.22), transparent 70%)",
-    } as React.CSSProperties;
-  }, [reduce]);
-}
+const fadeUp = {
+  hidden: { opacity: 0, y: 24 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.1, duration: 0.5, ease: [0.25, 0.1, 0.25, 1] as const },
+  }),
+};
 
 const Index = () => {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const orbScale = useTransform(scrollYProgress, [0, 1], [1, 0.88]);
-  const orbRotate = useTransform(scrollYProgress, [0, 1], [0, 18]);
-  const glowStyle = useHeroPointerGlow();
+  const heroRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={ref} className="min-h-screen bg-hero">
-      <header className="sticky top-0 z-40 border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
+    <div className="min-h-screen bg-background">
+      {/* NAV */}
+      <header className="sticky top-0 z-50 border-b border-border/50 glass">
         <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-display text-base tracking-tight">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-glow">
+          <Link to="/" className="flex items-center gap-2.5 font-display text-lg font-bold tracking-tight">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground">
               <Mic className="h-4 w-4" />
             </span>
-            <span>Playful Voice Studio</span>
+            VOXAI
           </Link>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="hero" size="sm">
-              <Link to="/auth">Sign in</Link>
+
+          <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
+            <a href="#features" className="transition hover:text-foreground">Features</a>
+            <a href="#how-it-works" className="transition hover:text-foreground">How It Works</a>
+            <a href="#cta" className="transition hover:text-foreground">Pricing</a>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/auth">Log In</Link>
             </Button>
-            <Button asChild variant="playful" size="sm">
-              <Link to="/app">Open Studio</Link>
+            <Button asChild variant="hero" size="sm">
+              <Link to="/auth?tab=signup">Get Started</Link>
             </Button>
           </div>
         </div>
       </header>
 
       <main>
+        {/* HERO */}
         <section
+          ref={heroRef}
           className="relative overflow-hidden"
           onMouseMove={(e) => {
-            const el = e.currentTarget;
+            const el = heroRef.current;
+            if (!el) return;
             const r = el.getBoundingClientRect();
-            const px = `${(((e.clientX - r.left) / r.width) * 100).toFixed(2)}%`;
-            const py = `${(((e.clientY - r.top) / r.height) * 100).toFixed(2)}%`;
-            el.style.setProperty("--px", px);
-            el.style.setProperty("--py", py);
+            el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width * 100).toFixed(1)}%`);
+            el.style.setProperty("--my", `${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`);
           }}
         >
-          <div className="pointer-events-none absolute inset-0 opacity-80" style={glowStyle} />
-          <div className="container grid gap-10 py-16 lg:grid-cols-12 lg:items-center lg:py-24">
-            <div className="lg:col-span-7">
-              <motion.h1
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="font-display text-4xl leading-[1.05] tracking-tight md:text-6xl"
-              >
-                Build custom voice AI agents —
-                <span className="block">test them live, ship them anywhere.</span>
-              </motion.h1>
-              <p className="mt-5 max-w-xl text-base text-muted-foreground md:text-lg">
-                A playful, premium studio for creating assistants: prompts, voice, tools, and real-time voice testing — in one
-                scroll-driven experience.
-              </p>
-              <div className="mt-7 flex flex-wrap gap-3">
-                <Button asChild variant="playful" size="lg">
-                  <Link to="/app">Start building</Link>
-                </Button>
-                <Button asChild variant="outline" size="lg">
-                  <a href="#story">See how it works</a>
-                </Button>
-              </div>
-              <div className="mt-8 grid grid-cols-2 gap-3 text-sm text-muted-foreground md:max-w-xl md:grid-cols-4">
-                <div className="rounded-xl border bg-background/60 p-3 shadow-pop">Builder</div>
-                <div className="rounded-xl border bg-background/60 p-3 shadow-pop">Voice playground</div>
-                <div className="rounded-xl border bg-background/60 p-3 shadow-pop">Tool toggles</div>
-                <div className="rounded-xl border bg-background/60 p-3 shadow-pop">Deploy-ready</div>
-              </div>
-            </div>
+          {/* Pointer-reactive glow */}
+          <div
+            className="pointer-events-none absolute inset-0 opacity-60"
+            style={{
+              background: "radial-gradient(600px 350px at var(--mx, 50%) var(--my, 30%), hsl(180 100% 50% / 0.07), transparent 70%)",
+            }}
+          />
+          {/* Static hero glow */}
+          <div className="pointer-events-none absolute inset-0 bg-hero" />
 
-            <div className="lg:col-span-5">
-              <motion.div
-                style={{ rotate: orbRotate, scale: orbScale }}
-                className="relative mx-auto aspect-square w-full max-w-md"
-              >
-                <div className="absolute inset-0 rounded-[2rem] bg-mesh shadow-glow" />
-                <div className="absolute inset-4 rounded-[1.75rem] border bg-background/60 shadow-pop backdrop-blur" />
-                <motion.div
-                  className="absolute inset-10 rounded-[1.5rem] border bg-card shadow-pop"
-                  animate={{ y: [0, -8, 0] }}
-                  transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut" }}
-                />
-                <div className="absolute inset-0 grid place-items-center">
-                  <div className="grid place-items-center gap-2 text-center">
-                    <div className="grid h-16 w-16 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-glow">
-                      <Mic className="h-7 w-7" />
+          <div className="container relative flex flex-col items-center py-24 text-center lg:py-36">
+            {/* Beta badge */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Now in Public Beta
+            </motion.div>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="max-w-4xl font-display text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl lg:text-8xl"
+            >
+              Build Custom{" "}
+              <br />
+              <span className="text-gradient">Voice AI Agents</span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.25 }}
+              className="mt-6 max-w-2xl text-base text-muted-foreground md:text-lg"
+            >
+              Create, customize, and deploy production-ready voice assistants in minutes. Plug in any LLM, voice, or tool — and go live.
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="mt-10 flex flex-wrap items-center justify-center gap-4"
+            >
+              <Button asChild variant="hero" size="lg">
+                <Link to="/auth?tab=signup">
+                  Start Building
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="hero-outline" size="lg">
+                <Link to="/app">
+                  <Mic className="h-4 w-4" />
+                  Try Live Demo
+                </Link>
+              </Button>
+            </motion.div>
+
+            {/* Animated Orb */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.6 }}
+              className="relative mt-16 flex items-center justify-center"
+            >
+              <div className="absolute h-64 w-64 rounded-full bg-primary/10 blur-3xl animate-orb-breathe" />
+              <div className="relative h-40 w-40 rounded-full bg-gradient-to-br from-primary/60 to-primary shadow-glow animate-pulse-glow" />
+              <div className="absolute h-28 w-28 rounded-full bg-primary/30 blur-xl animate-orb-breathe" style={{ animationDelay: "1s" }} />
+            </motion.div>
+          </div>
+        </section>
+
+        {/* FEATURES */}
+        <section id="features" className="border-t border-border/50 py-20 lg:py-28">
+          <div className="container">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeUp}
+              custom={0}
+              className="mb-14 text-center"
+            >
+              <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Everything You Need</h2>
+              <p className="mt-4 text-muted-foreground">
+                A complete platform for building, testing, and deploying voice AI at scale.
+              </p>
+            </motion.div>
+
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {features.map((f, i) => {
+                const Icon = f.icon;
+                return (
+                  <motion.div
+                    key={f.title}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-50px" }}
+                    variants={fadeUp}
+                    custom={i}
+                    className="group rounded-2xl border border-border/50 bg-card p-6 shadow-card transition-all duration-300 hover:border-primary/20 hover:shadow-glow"
+                  >
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-primary">
+                      <Icon className="h-5 w-5" />
                     </div>
-                    <p className="font-display text-lg">Live Voice Orb</p>
-                    <p className="max-w-[18rem] text-sm text-muted-foreground">
-                      Your playground shows connection, speaking state, and latency — in a vibe.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
+                    <h3 className="font-display text-lg font-semibold">{f.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
         </section>
 
-        <section id="story" className="container py-14 lg:py-20">
-          <div className="grid gap-8 lg:grid-cols-12">
-            <div className="lg:col-span-4">
-              <h2 className="font-display text-2xl tracking-tight md:text-3xl">A scrollytelling workflow</h2>
-              <p className="mt-3 text-muted-foreground">
-                Scroll to reveal the build loop. Each step has a sticky visual — like a product demo you can actually use.
+        {/* HOW IT WORKS */}
+        <section id="how-it-works" className="border-t border-border/50 py-20 lg:py-28">
+          <div className="container">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeUp}
+              custom={0}
+              className="mb-14 text-center"
+            >
+              <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">How It Works</h2>
+              <p className="mt-4 text-muted-foreground">Four steps to your first voice agent.</p>
+            </motion.div>
+
+            <div className="grid gap-6 lg:grid-cols-4">
+              {steps.map((s, i) => {
+                const Icon = s.icon;
+                return (
+                  <motion.div
+                    key={s.num}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-50px" }}
+                    variants={fadeUp}
+                    custom={i}
+                    className="relative rounded-2xl border border-border/50 bg-card p-6 shadow-card"
+                  >
+                    <span className="font-display text-4xl font-bold text-primary/20">{s.num}</span>
+                    <div className="mt-4 mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <h3 className="font-display text-base font-semibold">{s.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.desc}</p>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA */}
+        <section id="cta" className="border-t border-border/50 py-20 lg:py-28">
+          <div className="container">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeUp}
+              custom={0}
+              className="mx-auto max-w-2xl text-center"
+            >
+              <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">Ready to Build?</h2>
+              <p className="mt-4 text-muted-foreground">
+                Start creating your first voice agent in under 5 minutes. No credit card required.
               </p>
-              <div className="mt-6 flex gap-3">
-                <Button asChild variant="hero">
-                  <Link to="/app">Open Studio</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link to="/auth">Create account</Link>
-                </Button>
-              </div>
-            </div>
-
-            <div className="lg:col-span-8">
-              <div className="grid gap-5">
-                {steps.map((s, idx) => {
-                  const Icon = s.icon;
-                  return (
-                    <Card key={s.title} className="relative overflow-hidden bg-background/70 p-6 shadow-pop">
-                      <div className="absolute inset-0 opacity-60 [background-image:var(--gradient-mesh)]" />
-                      <div className="relative flex items-start gap-4">
-                        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-secondary-foreground shadow-pop">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-display text-lg tracking-tight">
-                            <span className="mr-2 text-muted-foreground">0{idx + 1}.</span>
-                            {s.title}
-                          </p>
-                          <p className="mt-1 text-sm text-muted-foreground">{s.desc}</p>
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="border-t bg-background/60">
-          <div className="container py-12">
-            <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-              <div>
-                <h3 className="font-display text-xl tracking-tight">Ready to build your first agent?</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Sign in, create an assistant, then hit “Start” in the voice playground.</p>
-              </div>
-              <div className="flex gap-3">
-                <Button asChild variant="playful">
-                  <Link to="/auth">Sign in</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link to="/app">Open Studio</Link>
+              <div className="mt-8">
+                <Button asChild variant="hero" size="lg">
+                  <Link to="/auth?tab=signup">
+                    Get Started Free
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
                 </Button>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
       </main>
+
+      {/* FOOTER */}
+      <footer className="border-t border-border/50 py-8">
+        <div className="container flex flex-col items-center justify-between gap-4 text-sm text-muted-foreground md:flex-row">
+          <div className="flex items-center gap-2 font-display font-bold text-foreground">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-primary-foreground text-xs">
+              <Mic className="h-3.5 w-3.5" />
+            </span>
+            VOXAI
+          </div>
+          <p>© {new Date().getFullYear()} VOXAI. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 };
