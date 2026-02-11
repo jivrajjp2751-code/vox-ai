@@ -4,14 +4,23 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 
 import { VoicePlayground } from "@/components/voice/VoicePlayground";
-import { Mic, Plus, Save, LogOut, Sparkles } from "lucide-react";
+import { Mic, Plus, Save, LogOut, Sparkles, Trash2, Brain, AudioWaveform, Languages, Wrench } from "lucide-react";
 
 type VoiceAssistantRow = {
   id: string;
@@ -33,16 +42,74 @@ type VoiceAssistantRow = {
 const defaultAssistantDraft = (): Partial<VoiceAssistantRow> => ({
   name: "New assistant",
   description: "",
-  system_prompt:
-    "You are a friendly voice assistant. Keep responses short, ask clarifying questions, and be helpful. If you don't know, say so.",
+  system_prompt: "You are a friendly voice assistant. Keep responses short, ask clarifying questions, and be helpful.",
   language: "en",
   conversation_mode: "friendly",
   temperature: 0.7,
   voice_provider: "elevenlabs",
-  voice_id: null,
+  voice_id: "JBFqnCBsd6RMkjVDRZzb",
   voice_speed: 1.0,
-  tools: { agentId: "" },
+  tools: { agentId: "", model: "gpt-4o", transcriber: "deepgram", functions: [] as string[] },
 });
+
+const MODELS = [
+  { value: "gpt-4o", label: "OpenAI GPT-4o" },
+  { value: "gpt-4o-mini", label: "OpenAI GPT-4o Mini" },
+  { value: "gpt-3.5-turbo", label: "OpenAI GPT-3.5 Turbo" },
+  { value: "claude-3.5-sonnet", label: "Anthropic Claude 3.5 Sonnet" },
+  { value: "claude-3-haiku", label: "Anthropic Claude 3 Haiku" },
+  { value: "gemini-2.5-flash", label: "Google Gemini 2.5 Flash" },
+  { value: "gemini-2.5-pro", label: "Google Gemini 2.5 Pro" },
+  { value: "llama-3.1-70b", label: "Meta Llama 3.1 70B" },
+];
+
+const VOICES = [
+  { value: "JBFqnCBsd6RMkjVDRZzb", label: "George — warm, authoritative" },
+  { value: "EXAVITQu4vr4xnSDxMaL", label: "Sarah — clear, professional" },
+  { value: "CwhRBWXzGAHq8TQ4Fs17", label: "Roger — calm, narrator" },
+  { value: "FGY2WhTYpPnrIDTdsKH5", label: "Laura — gentle, friendly" },
+  { value: "IKne3meq5aSn9XLyUdCD", label: "Charlie — energetic, youthful" },
+  { value: "pFZP5JQG7iQjIQuC4Bku", label: "Lily — soft, warm" },
+  { value: "onwK4e9ZLuTAKqWW03F9", label: "Daniel — deep, confident" },
+  { value: "iP95p4xoKVk53GoZ742B", label: "Chris — casual, conversational" },
+];
+
+const TRANSCRIBERS = [
+  { value: "deepgram", label: "Deepgram Nova-2" },
+  { value: "assembly-ai", label: "AssemblyAI" },
+  { value: "whisper", label: "OpenAI Whisper" },
+  { value: "google-stt", label: "Google Cloud STT" },
+];
+
+const LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "es", label: "Spanish" },
+  { value: "fr", label: "French" },
+  { value: "de", label: "German" },
+  { value: "pt", label: "Portuguese" },
+  { value: "ja", label: "Japanese" },
+  { value: "ko", label: "Korean" },
+  { value: "zh", label: "Chinese" },
+  { value: "hi", label: "Hindi" },
+  { value: "ar", label: "Arabic" },
+];
+
+const MODES = [
+  { value: "friendly", label: "Friendly" },
+  { value: "sales", label: "Sales" },
+  { value: "support", label: "Support" },
+  { value: "neutral", label: "Neutral" },
+  { value: "professional", label: "Professional" },
+];
+
+const FUNCTIONS = [
+  { value: "webhook", label: "Webhook POST" },
+  { value: "crm-update", label: "CRM Update" },
+  { value: "calendar-book", label: "Calendar Booking" },
+  { value: "knowledge-lookup", label: "Knowledge Base Lookup" },
+  { value: "send-email", label: "Send Email" },
+  { value: "transfer-call", label: "Transfer Call" },
+];
 
 export default function VoiceAgentStudio() {
   const [sessionChecked, setSessionChecked] = useState(false);
@@ -51,27 +118,28 @@ export default function VoiceAgentStudio() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<VoiceAssistantRow>>(defaultAssistantDraft());
   const [loading, setLoading] = useState(false);
+  const [builderTab, setBuilderTab] = useState("model");
 
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const activeAssistant = useMemo(() => assistants.find((a) => a.id === activeId) ?? null, [assistants, activeId]);
 
+  const tools = useMemo(() => (draft.tools ?? {}) as Record<string, any>, [draft.tools]);
+  const setTool = useCallback((key: string, val: any) => {
+    setDraft((p) => ({ ...p, tools: { ...(p.tools ?? {}), [key]: val } }));
+  }, []);
+
   const load = useCallback(async (uid: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("voice_assistants")
-        .select("*")
-        .order("updated_at", { ascending: false });
-
+      const { data, error } = await supabase.from("voice_assistants").select("*").order("updated_at", { ascending: false });
       if (error) throw error;
       const rows = (data ?? []) as unknown as VoiceAssistantRow[];
       setAssistants(rows);
-      if (!activeId && rows[0]) setActiveId(rows[0].id);
+      if (rows[0] && !activeId) setActiveId(rows[0].id);
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed to load assistants";
-      toast({ variant: "destructive", title: "Load error", description: message });
+      toast({ variant: "destructive", title: "Load error", description: e instanceof Error ? e.message : "Failed" });
     } finally {
       setLoading(false);
     }
@@ -83,8 +151,6 @@ export default function VoiceAgentStudio() {
       setSessionChecked(true);
       if (!session) navigate("/auth", { replace: true });
     });
-
-    // initial fetch
     supabase.auth.getSession().then(({ data }) => {
       const uid = data.session?.user?.id ?? null;
       setUserId(uid);
@@ -92,69 +158,70 @@ export default function VoiceAgentStudio() {
       if (!uid) navigate("/auth", { replace: true });
       else load(uid);
     });
-
     return () => data.subscription.unsubscribe();
   }, [navigate, load]);
 
   useEffect(() => {
     if (!activeAssistant) return;
-    setDraft({
-      ...activeAssistant,
-      tools: activeAssistant.tools ?? { agentId: "" },
-    });
+    setDraft({ ...activeAssistant, tools: activeAssistant.tools ?? defaultAssistantDraft().tools });
   }, [activeAssistant]);
 
   const createAssistant = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     try {
-      const payload = {
-        user_id: userId,
-        ...defaultAssistantDraft(),
-        name: `Assistant ${assistants.length + 1}`,
-      };
+      const payload = { user_id: userId, ...defaultAssistantDraft(), name: `Assistant ${assistants.length + 1}` };
       const { data, error } = await supabase.from("voice_assistants").insert(payload).select("*").maybeSingle();
       if (error) throw error;
-      if (!data) throw new Error("No assistant returned");
+      if (!data) throw new Error("No data");
       const row = data as unknown as VoiceAssistantRow;
-      setAssistants((prev) => [row, ...prev]);
+      setAssistants((p) => [row, ...p]);
       setActiveId(row.id);
-      toast({ title: "Assistant created", description: "Customize it and hit Start in the playground." });
+      toast({ title: "Created" });
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed to create assistant";
-      toast({ variant: "destructive", title: "Create error", description: message });
+      toast({ variant: "destructive", title: "Error", description: e instanceof Error ? e.message : "Failed" });
     } finally {
       setLoading(false);
     }
   }, [userId, assistants.length, toast]);
 
+  const deleteAssistant = useCallback(async () => {
+    if (!activeId) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from("voice_assistants").delete().eq("id", activeId);
+      if (error) throw error;
+      setAssistants((p) => p.filter((a) => a.id !== activeId));
+      setActiveId(null);
+      toast({ title: "Deleted" });
+    } catch (e: unknown) {
+      toast({ variant: "destructive", title: "Error", description: e instanceof Error ? e.message : "Failed" });
+    } finally {
+      setLoading(false);
+    }
+  }, [activeId, toast]);
+
   const saveAssistant = useCallback(async () => {
     if (!activeId) return;
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from("voice_assistants")
-        .update({
-          name: draft.name ?? "Untitled",
-          description: draft.description ?? null,
-          system_prompt: draft.system_prompt ?? "",
-          language: draft.language ?? "en",
-          conversation_mode: draft.conversation_mode ?? "neutral",
-          temperature: Number(draft.temperature ?? 0.7),
-          voice_provider: draft.voice_provider ?? "elevenlabs",
-          voice_id: draft.voice_id ?? null,
-          voice_speed: Number(draft.voice_speed ?? 1.0),
-          tools: draft.tools ?? {},
-        })
-        .eq("id", activeId);
-
+      const { error } = await supabase.from("voice_assistants").update({
+        name: draft.name ?? "Untitled",
+        description: draft.description ?? null,
+        system_prompt: draft.system_prompt ?? "",
+        language: draft.language ?? "en",
+        conversation_mode: draft.conversation_mode ?? "neutral",
+        temperature: Number(draft.temperature ?? 0.7),
+        voice_provider: draft.voice_provider ?? "elevenlabs",
+        voice_id: draft.voice_id ?? null,
+        voice_speed: Number(draft.voice_speed ?? 1.0),
+        tools: draft.tools ?? {},
+      }).eq("id", activeId);
       if (error) throw error;
-      toast({ title: "Saved", description: "Assistant updated." });
-      // reload list for updated_at ordering
+      toast({ title: "Saved" });
       if (userId) await load(userId);
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Failed to save assistant";
-      toast({ variant: "destructive", title: "Save error", description: message });
+      toast({ variant: "destructive", title: "Error", description: e instanceof Error ? e.message : "Failed" });
     } finally {
       setLoading(false);
     }
@@ -167,189 +234,278 @@ export default function VoiceAgentStudio() {
 
   if (!sessionChecked) {
     return (
-      <div className="min-h-screen bg-hero">
-        <div className="container grid min-h-screen place-items-center">
-          <Card className="w-full max-w-md bg-background/70 shadow-pop backdrop-blur">
-            <CardHeader>
-              <CardTitle className="font-display">Loading studio…</CardTitle>
-              <CardDescription>Checking your session.</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
+      <div className="grid min-h-screen place-items-center bg-background">
+        <p className="text-sm text-muted-foreground">Loading studio…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-hero">
-      <header className="sticky top-0 z-40 border-b bg-background/70 backdrop-blur supports-[backdrop-filter]:bg-background/50">
-        <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-display tracking-tight">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-glow">
-              <Mic className="h-4 w-4" />
-            </span>
-            <span>Studio</span>
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-border/40 glass">
+        <div className="flex h-12 items-center justify-between px-4">
+          <Link to="/" className="flex items-center gap-2 font-display text-sm font-bold tracking-tight">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-primary-foreground"><Mic className="h-3 w-3" /></span>
+            VOXAI Studio
           </Link>
-          <div className="flex items-center gap-2">
-            <Button variant="hero" size="sm" onClick={createAssistant} disabled={loading}>
-              <Plus className="h-4 w-4" />
-              New
-            </Button>
-            <Button variant="hero" size="sm" onClick={saveAssistant} disabled={loading || !activeId}>
-              <Save className="h-4 w-4" />
-              Save
-            </Button>
-            <Button variant="outline" size="sm" onClick={signOut}>
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="sm" onClick={createAssistant} disabled={loading}><Plus className="h-3.5 w-3.5" /> New</Button>
+            <Button variant="hero" size="sm" onClick={saveAssistant} disabled={loading || !activeId}><Save className="h-3.5 w-3.5" /> Save</Button>
+            <Button variant="ghost" size="sm" onClick={signOut}><LogOut className="h-3.5 w-3.5" /></Button>
           </div>
         </div>
       </header>
 
-      <main className="container grid gap-6 py-6 lg:grid-cols-12">
-        <section className="lg:col-span-4">
-          <Card className="bg-background/70 shadow-pop backdrop-blur">
-            <CardHeader>
-              <CardTitle className="font-display">Your assistants</CardTitle>
-              <CardDescription>Pick one to edit and test live.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-2">
+      {/* Main content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar: assistant list */}
+        <aside className="hidden w-64 shrink-0 border-r border-border/40 bg-card/50 lg:block">
+          <div className="flex h-full flex-col">
+            <div className="border-b border-border/30 px-4 py-3">
+              <p className="font-display text-xs font-semibold tracking-wide text-muted-foreground uppercase">Assistants</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
               {assistants.length === 0 ? (
-                <div className="rounded-xl border bg-background/60 p-4 text-sm text-muted-foreground">
-                  No assistants yet. Click <span className="font-medium text-foreground">New</span> to create your first.
-                </div>
+                <p className="px-2 py-4 text-xs text-muted-foreground">No assistants yet.</p>
               ) : (
-                assistants.map((a) => (
-                  <button
-                    key={a.id}
-                    onClick={() => setActiveId(a.id)}
-                    className={
-                      "w-full rounded-xl border bg-background/60 p-3 text-left shadow-pop transition hover:shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
-                      (a.id === activeId ? "ring-2 ring-ring" : "")
-                    }
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-display tracking-tight">{a.name}</p>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-1 text-xs text-secondary-foreground">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        {a.conversation_mode}
-                      </span>
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{a.description || "No description"}</p>
-                  </button>
-                ))
+                <div className="grid gap-1">
+                  {assistants.map((a) => (
+                    <button key={a.id} onClick={() => setActiveId(a.id)}
+                      className={`w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-secondary/60 ${a.id === activeId ? "bg-secondary text-secondary-foreground" : "text-muted-foreground"}`}>
+                      <p className="font-display text-xs font-medium truncate">{a.name}</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground truncate">{a.conversation_mode} · {a.language}</p>
+                    </button>
+                  ))}
+                </div>
               )}
-            </CardContent>
-            <CardFooter className="text-xs text-muted-foreground">
-              Saved per-user in your backend database.
-            </CardFooter>
-          </Card>
-        </section>
+            </div>
+          </div>
+        </aside>
 
-        <section className="lg:col-span-5">
-          <Card className="bg-background/70 shadow-pop backdrop-blur">
-            <CardHeader>
-              <CardTitle className="font-display">Assistant builder</CardTitle>
-              <CardDescription>Prompt + voice settings + runtime agent id.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" value={draft.name ?? ""} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} />
+        {/* Builder */}
+        <main className="flex flex-1 flex-col overflow-y-auto lg:flex-row">
+          <section className="flex-1 overflow-y-auto border-r border-border/30 p-4 lg:p-6">
+            {!activeId ? (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">Select or create an assistant to get started.</p>
+                  <Button variant="hero" size="sm" className="mt-3" onClick={createAssistant} disabled={loading}>
+                    <Plus className="h-3.5 w-3.5" /> Create Assistant
+                  </Button>
+                </div>
               </div>
+            ) : (
+              <div className="mx-auto max-w-2xl">
+                {/* Name & description */}
+                <div className="mb-5 flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <Input value={draft.name ?? ""} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))}
+                      className="border-none bg-transparent px-0 font-display text-lg font-bold focus-visible:ring-0" placeholder="Assistant name" />
+                    <Input value={draft.description ?? ""} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
+                      className="mt-1 border-none bg-transparent px-0 text-xs text-muted-foreground focus-visible:ring-0" placeholder="Short description…" />
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={deleteAssistant} disabled={loading} className="text-destructive hover:bg-destructive/10">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="desc">Description</Label>
-                <Input
-                  id="desc"
-                  value={draft.description ?? ""}
-                  onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
-                />
+                <Separator className="mb-5" />
+
+                {/* Tabbed builder — Vapi style */}
+                <Tabs value={builderTab} onValueChange={setBuilderTab}>
+                  <TabsList className="mb-4 grid w-full grid-cols-5">
+                    <TabsTrigger value="model" className="gap-1.5 text-xs"><Brain className="h-3 w-3" /> Model</TabsTrigger>
+                    <TabsTrigger value="voice" className="gap-1.5 text-xs"><AudioWaveform className="h-3 w-3" /> Voice</TabsTrigger>
+                    <TabsTrigger value="transcriber" className="gap-1.5 text-xs"><Languages className="h-3 w-3" /> Transcriber</TabsTrigger>
+                    <TabsTrigger value="functions" className="gap-1.5 text-xs"><Wrench className="h-3 w-3" /> Functions</TabsTrigger>
+                    <TabsTrigger value="advanced" className="gap-1.5 text-xs"><Sparkles className="h-3 w-3" /> Advanced</TabsTrigger>
+                  </TabsList>
+
+                  {/* MODEL TAB */}
+                  <TabsContent value="model" className="space-y-4">
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm">LLM Provider</CardTitle>
+                        <CardDescription className="text-xs">Choose the model that powers your assistant's intelligence.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Model</Label>
+                          <Select value={tools.model ?? "gpt-4o"} onValueChange={(v) => setTool("model", v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {MODELS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">System Prompt</Label>
+                          <Textarea value={draft.system_prompt ?? ""} onChange={(e) => setDraft((p) => ({ ...p, system_prompt: e.target.value }))}
+                            className="min-h-[120px] text-xs" placeholder="You are a helpful assistant…" />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs">Temperature</Label>
+                            <span className="text-xs text-muted-foreground">{(draft.temperature ?? 0.7).toFixed(1)}</span>
+                          </div>
+                          <Slider value={[draft.temperature ?? 0.7]} onValueChange={([v]) => setDraft((p) => ({ ...p, temperature: v }))}
+                            min={0} max={2} step={0.1} className="w-full" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* VOICE TAB */}
+                  <TabsContent value="voice" className="space-y-4">
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm">Voice Configuration</CardTitle>
+                        <CardDescription className="text-xs">Select the voice and tune its characteristics.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Voice Provider</Label>
+                          <Select value={draft.voice_provider ?? "elevenlabs"} onValueChange={(v) => setDraft((p) => ({ ...p, voice_provider: v }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="elevenlabs">ElevenLabs</SelectItem>
+                              <SelectItem value="openai-tts">OpenAI TTS</SelectItem>
+                              <SelectItem value="playht">PlayHT</SelectItem>
+                              <SelectItem value="deepgram-tts">Deepgram Aura</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Voice</Label>
+                          <Select value={draft.voice_id ?? ""} onValueChange={(v) => setDraft((p) => ({ ...p, voice_id: v }))}>
+                            <SelectTrigger><SelectValue placeholder="Select a voice" /></SelectTrigger>
+                            <SelectContent>
+                              {VOICES.map((v) => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs">Speed</Label>
+                            <span className="text-xs text-muted-foreground">{(draft.voice_speed ?? 1.0).toFixed(1)}x</span>
+                          </div>
+                          <Slider value={[draft.voice_speed ?? 1.0]} onValueChange={([v]) => setDraft((p) => ({ ...p, voice_speed: v }))}
+                            min={0.5} max={2.0} step={0.1} className="w-full" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* TRANSCRIBER TAB */}
+                  <TabsContent value="transcriber" className="space-y-4">
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm">Speech-to-Text</CardTitle>
+                        <CardDescription className="text-xs">Choose a transcription provider for real-time STT.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Transcriber</Label>
+                          <Select value={tools.transcriber ?? "deepgram"} onValueChange={(v) => setTool("transcriber", v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {TRANSCRIBERS.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Language</Label>
+                          <Select value={draft.language ?? "en"} onValueChange={(v) => setDraft((p) => ({ ...p, language: v }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {LANGUAGES.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* FUNCTIONS TAB */}
+                  <TabsContent value="functions" className="space-y-4">
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm">Tool Calling & Functions</CardTitle>
+                        <CardDescription className="text-xs">Enable actions your assistant can perform during conversations.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid gap-2">
+                          {FUNCTIONS.map((fn) => {
+                            const enabled = ((tools.functions ?? []) as string[]).includes(fn.value);
+                            return (
+                              <button key={fn.value} onClick={() => {
+                                const prev = (tools.functions ?? []) as string[];
+                                setTool("functions", enabled ? prev.filter((f: string) => f !== fn.value) : [...prev, fn.value]);
+                              }}
+                                className={`flex items-center justify-between rounded-lg border px-3 py-2.5 text-left text-xs transition ${enabled ? "border-primary/30 bg-primary/5 text-foreground" : "border-border/40 text-muted-foreground hover:border-border"}`}>
+                                <span>{fn.label}</span>
+                                <span className={`inline-flex h-5 w-9 items-center rounded-full px-0.5 transition ${enabled ? "bg-primary" : "bg-secondary"}`}>
+                                  <span className={`h-4 w-4 rounded-full bg-background shadow transition-transform ${enabled ? "translate-x-4" : "translate-x-0"}`} />
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* ADVANCED TAB */}
+                  <TabsContent value="advanced" className="space-y-4">
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm">Advanced Settings</CardTitle>
+                        <CardDescription className="text-xs">Runtime configuration and deployment options.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Conversation Mode</Label>
+                          <Select value={draft.conversation_mode ?? "neutral"} onValueChange={(v) => setDraft((p) => ({ ...p, conversation_mode: v }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {MODES.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">ElevenLabs Agent ID</Label>
+                          <Input value={tools.agentId ?? ""} onChange={(e) => setTool("agentId", e.target.value)}
+                            placeholder="Paste your public Agent ID" className="text-xs" />
+                          <p className="text-[10px] text-muted-foreground">Required for live voice testing via WebRTC.</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
               </div>
+            )}
+          </section>
 
-              <div className="grid gap-2">
-                <Label htmlFor="prompt">System prompt</Label>
-                <Textarea
-                  id="prompt"
-                  value={draft.system_prompt ?? ""}
-                  onChange={(e) => setDraft((p) => ({ ...p, system_prompt: e.target.value }))}
-                  className="min-h-[160px]"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="agentId">ElevenLabs Agent ID (public)</Label>
-                <Input
-                  id="agentId"
-                  placeholder="Paste your Agent ID"
-                  value={(draft.tools?.agentId as string) ?? ""}
-                  onChange={(e) => setDraft((p) => ({ ...p, tools: { ...(p.tools ?? {}), agentId: e.target.value } }))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  For v1 we connect directly with a public Agent ID. Next we can secure this with backend token generation.
-                </p>
-              </div>
-
-              <Separator />
-              <div className="grid gap-2">
-                <Label htmlFor="lang">Language (ISO code)</Label>
-                <Input
-                  id="lang"
-                  value={draft.language ?? "en"}
-                  onChange={(e) => setDraft((p) => ({ ...p, language: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="mode">Conversation mode</Label>
-                <Input
-                  id="mode"
-                  value={draft.conversation_mode ?? "neutral"}
-                  onChange={(e) => setDraft((p) => ({ ...p, conversation_mode: e.target.value }))}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="temp">Temperature</Label>
-                <Input
-                  id="temp"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="2"
-                  value={String(draft.temperature ?? 0.7)}
-                  onChange={(e) => setDraft((p) => ({ ...p, temperature: Number(e.target.value) }))}
-                />
-              </div>
-            </CardContent>
-            <CardFooter className="justify-between">
-              <p className="text-xs text-muted-foreground">Tip: Save, then start the playground.</p>
-              <Button variant="hero" size="sm" onClick={saveAssistant} disabled={loading || !activeId}>
-                <Save className="h-4 w-4" />
-                Save
-              </Button>
-            </CardFooter>
-          </Card>
-        </section>
-
-        <section className="lg:col-span-3">
-          <VoicePlayground
-            assistant={
-              activeAssistant
-                ? {
-                    name: activeAssistant.name,
-                    systemPrompt: activeAssistant.system_prompt,
-                    language: activeAssistant.language,
-                    conversationMode: activeAssistant.conversation_mode,
-                    temperature: activeAssistant.temperature,
-                    agentId: (activeAssistant.tools as any)?.agentId as string | undefined,
-                  }
-                : null
-            }
-          />
-        </section>
-      </main>
+          {/* Voice playground sidebar */}
+          <aside className="w-full shrink-0 overflow-y-auto border-t border-border/30 p-4 lg:w-80 lg:border-t-0 lg:p-4">
+            <VoicePlayground
+              assistant={
+                activeAssistant
+                  ? {
+                      name: activeAssistant.name,
+                      systemPrompt: activeAssistant.system_prompt,
+                      language: activeAssistant.language,
+                      conversationMode: activeAssistant.conversation_mode,
+                      temperature: activeAssistant.temperature,
+                      agentId: (activeAssistant.tools as any)?.agentId as string | undefined,
+                    }
+                  : null
+              }
+            />
+          </aside>
+        </main>
+      </div>
     </div>
   );
 }
