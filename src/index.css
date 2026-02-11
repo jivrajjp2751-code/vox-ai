@@ -15,7 +15,7 @@
     --card: 220 18% 7%;
     --card-foreground: 0 0% 95%;
 
-    --popover: 220 18% 7%;
+    --popover: 220 18% 8%;
     --popover-foreground: 0 0% 95%;
 
     --primary: 180 100% 50%;
@@ -33,22 +33,20 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 14% 14%;
-    --input: 220 14% 14%;
+    --border: 220 14% 16%;
+    --input: 220 14% 16%;
     --ring: 180 100% 50%;
 
     --radius: 0.75rem;
 
-    --gradient-hero: radial-gradient(800px 400px at 50% 0%, hsl(180 100% 50% / 0.08), transparent 70%);
-    --gradient-mesh: radial-gradient(600px 360px at 30% 20%, hsl(180 100% 50% / 0.12), transparent 60%),
-      radial-gradient(520px 340px at 70% 70%, hsl(270 80% 65% / 0.08), transparent 60%);
+    --gradient-hero: radial-gradient(800px 400px at 50% 0%, hsl(180 100% 50% / 0.06), transparent 70%);
+    --gradient-mesh: radial-gradient(600px 360px at 30% 20%, hsl(180 100% 50% / 0.1), transparent 60%),
+      radial-gradient(520px 340px at 70% 70%, hsl(270 80% 65% / 0.06), transparent 60%);
     --gradient-text: linear-gradient(135deg, hsl(270 80% 70%), hsl(180 100% 55%));
-    --gradient-card: linear-gradient(180deg, hsl(220 18% 10%), hsl(220 18% 7%));
-    --gradient-glow: radial-gradient(400px 200px at 50% 50%, hsl(180 100% 50% / 0.15), transparent 70%);
 
-    --shadow-pop: 0 8px 32px -8px hsl(0 0% 0% / 0.6);
-    --shadow-glow: 0 0 40px -12px hsl(180 100% 50% / 0.4);
-    --shadow-card: 0 1px 0 0 hsl(0 0% 100% / 0.04) inset, 0 8px 24px -8px hsl(0 0% 0% / 0.5);
+    --shadow-pop: 0 4px 20px -6px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 30px -8px hsl(180 100% 50% / 0.35);
+    --shadow-card: 0 1px 0 0 hsl(0 0% 100% / 0.03) inset, 0 4px 16px -6px hsl(0 0% 0% / 0.4);
 
     --sidebar-background: 220 20% 4%;
     --sidebar-foreground: 0 0% 95%;
@@ -56,7 +54,7 @@
     --sidebar-primary-foreground: 220 20% 4%;
     --sidebar-accent: 220 18% 12%;
     --sidebar-accent-foreground: 0 0% 88%;
-    --sidebar-border: 220 14% 14%;
+    --sidebar-border: 220 14% 16%;
     --sidebar-ring: 180 100% 50%;
   }
 }
@@ -66,8 +64,13 @@
     @apply border-border;
   }
 
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     font-family: var(--font-sans);
+    overflow-x: hidden;
     @apply bg-background text-foreground antialiased;
   }
 
@@ -84,12 +87,8 @@
     background-clip: text;
   }
 
-  .glow-border {
-    border: 1px solid hsl(180 100% 50% / 0.15);
-  }
-
   .glass {
-    background: hsl(220 18% 7% / 0.6);
+    background: hsl(220 18% 5% / 0.75);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
