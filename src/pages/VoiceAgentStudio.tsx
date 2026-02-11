@@ -20,7 +20,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 
 import { VoicePlayground } from "@/components/voice/VoicePlayground";
-import { Mic, Plus, Save, LogOut, Sparkles, Trash2, Brain, AudioWaveform, Languages, Wrench } from "lucide-react";
+import { Mic, Plus, Save, LogOut, Sparkles, Trash2, Brain, AudioWaveform, Languages, Wrench, Volume2, Phone } from "lucide-react";
 
 type VoiceAssistantRow = {
   id: string;
@@ -250,6 +250,7 @@ export default function VoiceAgentStudio() {
             VOXAI Studio
           </Link>
           <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="sm" asChild><Link to="/phone-numbers"><Phone className="h-3.5 w-3.5" /> Numbers</Link></Button>
             <Button variant="ghost" size="sm" onClick={createAssistant} disabled={loading}><Plus className="h-3.5 w-3.5" /> New</Button>
             <Button variant="hero" size="sm" onClick={saveAssistant} disabled={loading || !activeId}><Save className="h-3.5 w-3.5" /> Save</Button>
             <Button variant="ghost" size="sm" onClick={signOut}><LogOut className="h-3.5 w-3.5" /></Button>
@@ -378,12 +379,23 @@ export default function VoiceAgentStudio() {
                         </div>
                         <div className="grid gap-1.5">
                           <Label className="text-xs">Voice Preset</Label>
-                          <Select value={draft.voice_id ?? ""} onValueChange={(v) => setDraft((p) => ({ ...p, voice_id: v }))}>
-                            <SelectTrigger><SelectValue placeholder="Select a voice" /></SelectTrigger>
-                            <SelectContent>
-                              {VOICES.map((v) => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                          <div className="space-y-1">
+                            {VOICES.map((v) => (
+                              <div key={v.value} className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs transition cursor-pointer ${draft.voice_id === v.value ? "border-primary/30 bg-primary/5 text-foreground" : "border-border/40 text-muted-foreground hover:border-border"}`}
+                                onClick={() => setDraft((p) => ({ ...p, voice_id: v.value }))}>
+                                <span>{v.label}</span>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.speechSynthesis.cancel();
+                                  const u = new SpeechSynthesisUtterance(`Hi, I'm ${v.label.split("—")[0].trim()}. How can I help you today?`);
+                                  u.lang = draft.language ?? "en";
+                                  window.speechSynthesis.speak(u);
+                                }}>
+                                  <Volume2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         <div className="grid gap-1.5">
                           <Label className="text-xs">Custom Voice ID</Label>
