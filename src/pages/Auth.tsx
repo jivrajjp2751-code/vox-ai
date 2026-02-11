@@ -143,7 +143,7 @@ export default function Auth() {
                   )}
                 </div>
 
-                <Button type="submit" variant="playful" disabled={loading}>
+                <Button type="submit" variant="hero" disabled={loading}>
                   {loading ? "Working…" : tab === "login" ? "Sign in" : "Create account"}
                 </Button>
               </form>
