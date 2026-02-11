@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import VoiceAgentStudio from "./pages/VoiceAgentStudio";
+import PhoneNumbers from "./pages/PhoneNumbers";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/app" element={<VoiceAgentStudio />} />
+          <Route path="/phone-numbers" element={<PhoneNumbers />} />
           <Route path="/studio" element={<Navigate to="/app" replace />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -4,7 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, MicOff, Square, Sparkles, Volume2 } from "lucide-react";
+import { Mic, MicOff, Phone, PhoneOff, Sparkles, Volume2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 export type PlaygroundAssistant = {
@@ -24,95 +24,117 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
   const reduceMotion = useReducedMotion();
   const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
   const [messages, setMessages] = useState<Message[]>([]);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const statusLabel = useMemo(() => {
     switch (status) {
       case "listening": return "Listening…";
       case "thinking": return "Thinking…";
       case "speaking": return "Speaking…";
-      default: return "Idle";
+      default: return "Ready to talk";
     }
   }, [status]);
 
-  const start = useCallback(async () => {
+  const speak = useCallback((text: string) => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = assistant?.language ?? "en";
+    utterance.rate = 1.0;
+    synthRef.current = utterance;
+    utterance.onend = () => setStatus("idle");
+    utterance.onerror = () => setStatus("idle");
+    setStatus("speaking");
+    window.speechSynthesis.speak(utterance);
+  }, [assistant?.language]);
+
+  const getAIResponse = useCallback(async (userText: string) => {
+    setStatus("thinking");
+    setMessages((prev) => [...prev, { role: "user", text: userText }]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("voice-chat", {
+        body: {
+          userMessage: userText,
+          systemPrompt: assistant?.systemPrompt ?? "You are a helpful voice assistant.",
+          temperature: assistant?.temperature ?? 0.7,
+          conversationHistory: messages.slice(-6).map((m) => ({
+            role: m.role,
+            content: m.text,
+          })),
+        },
+      });
+
+      if (error) throw error;
+      const reply = data?.reply ?? "Sorry, I couldn't process that.";
+      setMessages((prev) => [...prev, { role: "assistant", text: reply }]);
+      speak(reply);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to get response";
+      toast({ variant: "destructive", title: "AI Error", description: msg });
+      setStatus("idle");
+    }
+  }, [assistant, messages, speak, toast]);
+
+  const startTalking = useCallback(() => {
     if (!assistant) {
       toast({ variant: "destructive", title: "No assistant", description: "Select or create an assistant first." });
       return;
     }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      mediaRecorder.start();
-      setStatus("listening");
-      toast({ title: "Listening", description: "Speak now. Click Stop when done." });
-    } catch (e: unknown) {
-      toast({ variant: "destructive", title: "Mic error", description: e instanceof Error ? e.message : "Could not access microphone" });
-    }
-  }, [assistant, toast]);
-
-  const stop = useCallback(async () => {
-    const mediaRecorder = mediaRecorderRef.current;
-    if (!mediaRecorder || mediaRecorder.state === "inactive") {
-      setStatus("idle");
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast({ variant: "destructive", title: "Not supported", description: "Speech recognition is not supported in this browser. Try Chrome." });
       return;
     }
 
-    mediaRecorder.onstop = async () => {
-      // Stop mic tracks
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = assistant.language ?? "en";
+    recognitionRef.current = recognition;
 
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-      
-      if (audioBlob.size < 100) {
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0]?.[0]?.transcript;
+      if (transcript) {
+        getAIResponse(transcript);
+      } else {
         setStatus("idle");
-        toast({ variant: "destructive", title: "No audio", description: "No audio was captured. Try again." });
-        return;
       }
-
-      setStatus("thinking");
-
-      // For now, simulate a response since we don't have a full pipeline edge function yet
-      // In production this would call a backend function that does STT -> LLM -> TTS
-      const userText = "Voice message recorded";
-      setMessages((prev) => [...prev, { role: "user", text: userText }]);
-
-      // Simulate assistant response
-      setTimeout(() => {
-        const responseText = `Hi! I'm ${assistant?.name ?? "your assistant"}. I received your voice message. The full voice pipeline (STT → LLM → TTS) requires backend functions to be configured. For now, the assistant builder is ready for you to configure all settings!`;
-        setMessages((prev) => [...prev, { role: "assistant", text: responseText }]);
-        setStatus("idle");
-        toast({ title: "Response ready" });
-      }, 1500);
     };
 
-    mediaRecorder.stop();
-  }, [assistant, toast]);
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      if (event.error !== "aborted") {
+        toast({ variant: "destructive", title: "Mic error", description: event.error });
+      }
+      setStatus("idle");
+    };
 
-  const cancel = useCallback(() => {
-    const mediaRecorder = mediaRecorderRef.current;
-    if (mediaRecorder && mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop();
-    }
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    recognition.onend = () => {
+      if (status === "listening") {
+        // If still in listening mode and no result came, stay idle
+      }
+    };
+
+    recognition.start();
+    setStatus("listening");
+  }, [assistant, getAIResponse, toast, status]);
+
+  const stopTalking = useCallback(() => {
+    recognitionRef.current?.abort();
+    window.speechSynthesis.cancel();
     setStatus("idle");
   }, []);
+
+  const isActive = status !== "idle";
 
   return (
     <Card className="border-border/40 bg-card shadow-card">
       <CardHeader className="pb-3">
-        <CardTitle className="font-display text-sm">Live Voice Test</CardTitle>
-        <CardDescription className="text-[11px]">Record → Transcribe → LLM → Speak</CardDescription>
+        <CardTitle className="font-display text-sm">Voice Playground</CardTitle>
+        <CardDescription className="text-[11px]">Talk directly with your assistant</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Status bar */}
@@ -122,7 +144,7 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
             <p className="text-[10px] text-muted-foreground">{statusLabel}</p>
           </div>
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-            <Volume2 className="h-3 w-3" /> {assistant?.voiceProvider ?? "elevenlabs"}
+            <Volume2 className="h-3 w-3" /> {assistant?.voiceProvider ?? "browser"}
           </span>
         </div>
 
@@ -137,25 +159,25 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
         <div className="relative grid place-items-center overflow-hidden rounded-xl border border-border/30 bg-background py-8">
           <div className="pointer-events-none absolute inset-0" style={{ background: "var(--gradient-mesh)" }} />
           <motion.div
-            className="relative grid h-24 w-24 place-items-center rounded-full border border-primary/20 bg-background/80 shadow-pop"
+            className={`relative grid h-24 w-24 place-items-center rounded-full border bg-background/80 shadow-pop transition-colors ${isActive ? "border-primary/40" : "border-primary/20"}`}
             animate={reduceMotion ? undefined : {
-              scale: status === "listening" ? [1, 1.12, 1] : status === "speaking" ? [1, 1.08, 1] : status === "thinking" ? [1, 1.04, 1] : 1,
+              scale: status === "listening" ? [1, 1.15, 1] : status === "speaking" ? [1, 1.1, 1] : status === "thinking" ? [1, 1.05, 1] : 1,
             }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
           >
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground shadow-glow">
+            <div className={`grid h-10 w-10 place-items-center rounded-xl shadow-glow transition-colors ${isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
               {status === "listening" ? <Mic className="h-5 w-5 animate-pulse" /> :
                status === "speaking" ? <Sparkles className="h-5 w-5" /> :
                status === "thinking" ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" /> :
-               <Mic className="h-5 w-5" />}
+               <Phone className="h-5 w-5" />}
             </div>
           </motion.div>
         </div>
 
         {/* Messages */}
         {messages.length > 0 && (
-          <div className="max-h-32 overflow-y-auto space-y-1.5 rounded-lg border border-border/20 bg-secondary/20 p-2">
-            {messages.slice(-4).map((m, i) => (
+          <div className="max-h-40 overflow-y-auto space-y-1.5 rounded-lg border border-border/20 bg-secondary/20 p-2">
+            {messages.slice(-6).map((m, i) => (
               <div key={i} className={`text-[10px] leading-relaxed ${m.role === "user" ? "text-muted-foreground" : "text-foreground"}`}>
                 <span className="font-display font-semibold">{m.role === "user" ? "You" : assistant?.name ?? "AI"}:</span> {m.text}
               </div>
@@ -164,21 +186,16 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
         )}
 
         {/* Controls */}
-        {status === "listening" ? (
-          <div className="flex gap-2">
-            <Button variant="hero" className="flex-1" onClick={stop}><Square className="h-3.5 w-3.5" /> Stop & Process</Button>
-            <Button variant="outline" size="icon" onClick={cancel}><MicOff className="h-3.5 w-3.5" /></Button>
-          </div>
-        ) : status === "thinking" || status === "speaking" ? (
-          <Button variant="outline" className="w-full" onClick={cancel} disabled={status === "thinking"}>
-            <MicOff className="h-3.5 w-3.5" /> Cancel
+        {isActive ? (
+          <Button variant="destructive" className="w-full" onClick={stopTalking}>
+            <PhoneOff className="h-3.5 w-3.5" /> End Conversation
           </Button>
         ) : (
-          <Button variant="hero" className="w-full" onClick={start}>
-            <Mic className="h-3.5 w-3.5" /> Start Recording
+          <Button variant="hero" className="w-full" onClick={startTalking}>
+            <Phone className="h-3.5 w-3.5" /> Talk to Assistant
           </Button>
         )}
-        <p className="text-center text-[10px] text-muted-foreground">Requires microphone access.</p>
+        <p className="text-center text-[10px] text-muted-foreground">Uses browser speech recognition & synthesis. Works best in Chrome.</p>
       </CardContent>
     </Card>
   );
