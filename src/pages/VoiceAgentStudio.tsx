@@ -21,6 +21,7 @@ import { Slider } from "@/components/ui/slider";
 
 import { VoicePlayground } from "@/components/voice/VoicePlayground";
 import { Mic, Plus, Save, LogOut, Sparkles, Trash2, Brain, AudioWaveform, Languages, Wrench, Volume2, Phone } from "lucide-react";
+import voxaiLogo from "@/assets/voxai-logo.png";
 
 type VoiceAssistantRow = {
   id: string;
@@ -246,7 +247,7 @@ export default function VoiceAgentStudio() {
       <header className="sticky top-0 z-40 border-b border-border/40 glass">
         <div className="flex h-12 items-center justify-between px-4">
           <Link to="/" className="flex items-center gap-2 font-display text-sm font-bold tracking-tight">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-primary-foreground"><Mic className="h-3 w-3" /></span>
+            <img src={voxaiLogo} alt="VOXAI" className="h-7 w-7 rounded-lg" />
             VOXAI Studio
           </Link>
           <div className="flex items-center gap-1.5">
