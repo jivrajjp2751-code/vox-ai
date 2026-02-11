@@ -26,6 +26,10 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
   const [messages, setMessages] = useState<Message[]>([]);
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const messagesRef = useRef<Message[]>([]);
+
+  // Keep a ref in sync so the callbacks always have latest messages
+  messagesRef.current = messages;
 
   const statusLabel = useMemo(() => {
     switch (status) {
@@ -37,21 +41,39 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
   }, [status]);
 
   const speak = useCallback((text: string) => {
-    if (!("speechSynthesis" in window)) return;
+    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
+
+    if (!("speechSynthesis" in window)) {
+      setStatus("idle");
+      return;
+    }
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = assistant?.language ?? "en";
     utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
     synthRef.current = utterance;
+
     utterance.onend = () => setStatus("idle");
-    utterance.onerror = () => setStatus("idle");
+    utterance.onerror = (e) => {
+      console.error("Speech synthesis error:", e);
+      setStatus("idle");
+    };
+
     setStatus("speaking");
-    window.speechSynthesis.speak(utterance);
+
+    // Small delay to ensure synthesis is ready (Chrome quirk)
+    setTimeout(() => {
+      window.speechSynthesis.speak(utterance);
+    }, 50);
   }, [assistant?.language]);
 
   const getAIResponse = useCallback(async (userText: string) => {
     setStatus("thinking");
-    setMessages((prev) => [...prev, { role: "user", text: userText }]);
+    const newMessages = [...messagesRef.current, { role: "user" as const, text: userText }];
+    setMessages(newMessages);
 
     try {
       const { data, error } = await supabase.functions.invoke("voice-chat", {
@@ -59,7 +81,7 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
           userMessage: userText,
           systemPrompt: assistant?.systemPrompt ?? "You are a helpful voice assistant.",
           temperature: assistant?.temperature ?? 0.7,
-          conversationHistory: messages.slice(-6).map((m) => ({
+          conversationHistory: newMessages.slice(-6).map((m) => ({
             role: m.role,
             content: m.text,
           })),
@@ -75,7 +97,7 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
       toast({ variant: "destructive", title: "AI Error", description: msg });
       setStatus("idle");
     }
-  }, [assistant, messages, speak, toast]);
+  }, [assistant, speak, toast]);
 
   const startTalking = useCallback(() => {
     if (!assistant) {
@@ -88,6 +110,9 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
       toast({ variant: "destructive", title: "Not supported", description: "Speech recognition is not supported in this browser. Try Chrome." });
       return;
     }
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
 
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
@@ -106,21 +131,25 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
 
     recognition.onerror = (event: any) => {
       console.error("Speech recognition error:", event.error);
-      if (event.error !== "aborted") {
+      if (event.error !== "aborted" && event.error !== "no-speech") {
         toast({ variant: "destructive", title: "Mic error", description: event.error });
       }
       setStatus("idle");
     };
 
     recognition.onend = () => {
-      if (status === "listening") {
-        // If still in listening mode and no result came, stay idle
-      }
+      // Recognition ended without result
     };
 
-    recognition.start();
-    setStatus("listening");
-  }, [assistant, getAIResponse, toast, status]);
+    try {
+      recognition.start();
+      setStatus("listening");
+    } catch (e) {
+      console.error("Failed to start recognition:", e);
+      toast({ variant: "destructive", title: "Mic error", description: "Could not start microphone." });
+      setStatus("idle");
+    }
+  }, [assistant, getAIResponse, toast]);
 
   const stopTalking = useCallback(() => {
     recognitionRef.current?.abort();

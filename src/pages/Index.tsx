@@ -18,6 +18,7 @@ import {
 
 import robotHead from "@/assets/robot-head.png";
 import frequencyWave from "@/assets/frequency-wave.png";
+import voxaiLogo from "@/assets/voxai-logo.png";
 
 /* ─── Data ─── */
 const features = [
@@ -83,9 +84,7 @@ const Index = () => {
       <header className="sticky top-0 z-50 border-b border-border/40 glass">
         <div className="container flex h-14 items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-display text-base font-bold tracking-tight">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <Mic className="h-3.5 w-3.5" />
-            </span>
+            <img src={voxaiLogo} alt="VOXAI" className="h-8 w-8 rounded-lg" />
             VOXAI
           </Link>
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
@@ -114,7 +113,7 @@ const Index = () => {
           }}
         >
           {/* Pointer glow */}
-          <div className="pointer-events-none absolute inset-0 opacity-50" style={{ background: "radial-gradient(500px 280px at var(--mx, 50%) var(--my, 30%), hsl(180 100% 50% / 0.06), transparent 70%)" }} />
+          <div className="pointer-events-none absolute inset-0 opacity-50" style={{ background: "radial-gradient(500px 280px at var(--mx, 50%) var(--my, 30%), hsl(330 100% 64% / 0.08), transparent 70%)" }} />
           <div className="pointer-events-none absolute inset-0 bg-hero" />
 
           {/* Floating robot image - parallax */}
@@ -320,7 +319,7 @@ const Index = () => {
       <footer className="border-t border-border/30 py-6">
         <div className="container flex flex-col items-center justify-between gap-3 px-4 text-xs text-muted-foreground sm:flex-row">
           <div className="flex items-center gap-2 font-display font-bold text-foreground">
-            <span className="grid h-6 w-6 place-items-center rounded bg-primary text-primary-foreground text-[10px]"><Mic className="h-3 w-3" /></span>
+            <img src={voxaiLogo} alt="VOXAI" className="h-6 w-6 rounded" />
             VOXAI
           </div>
           <p>© {new Date().getFullYear()} VOXAI. All rights reserved.</p>
