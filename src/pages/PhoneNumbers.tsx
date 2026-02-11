@@ -208,10 +208,10 @@ export default function PhoneNumbers() {
                         <TableCell className="text-xs capitalize">{n.provider}</TableCell>
                         <TableCell className="text-xs">{n.label}</TableCell>
                         <TableCell>
-                          <Select value={n.assistantId ?? ""} onValueChange={(v) => assignAssistant(n.id, v)}>
+                          <Select value={n.assistantId ?? "none"} onValueChange={(v) => assignAssistant(n.id, v === "none" ? "" : v)}>
                             <SelectTrigger className="h-7 text-[11px]"><SelectValue placeholder="Assign…" /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">None</SelectItem>
+                              <SelectItem value="none">None</SelectItem>
                               {assistants.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                             </SelectContent>
                           </Select>
