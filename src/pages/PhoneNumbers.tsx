@@ -45,6 +45,7 @@ type VoiceAssistant = {
   name: string;
 };
 
+// Phone Numbers management page
 export default function PhoneNumbers() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [numbers, setNumbers] = useState<PhoneNumber[]>([]);
