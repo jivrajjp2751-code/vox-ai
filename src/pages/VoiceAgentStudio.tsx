@@ -377,13 +377,19 @@ export default function VoiceAgentStudio() {
                           </Select>
                         </div>
                         <div className="grid gap-1.5">
-                          <Label className="text-xs">Voice</Label>
+                          <Label className="text-xs">Voice Preset</Label>
                           <Select value={draft.voice_id ?? ""} onValueChange={(v) => setDraft((p) => ({ ...p, voice_id: v }))}>
                             <SelectTrigger><SelectValue placeholder="Select a voice" /></SelectTrigger>
                             <SelectContent>
                               {VOICES.map((v) => <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>)}
                             </SelectContent>
                           </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Custom Voice ID</Label>
+                          <Input value={draft.voice_id ?? ""} onChange={(e) => setDraft((p) => ({ ...p, voice_id: e.target.value }))}
+                            placeholder="Paste any ElevenLabs / provider voice ID" className="text-xs font-mono" />
+                          <p className="text-[10px] text-muted-foreground">Override the preset above with any voice ID from your provider.</p>
                         </div>
                         <div className="grid gap-1.5">
                           <div className="flex items-center justify-between">
@@ -474,10 +480,15 @@ export default function VoiceAgentStudio() {
                           </Select>
                         </div>
                         <div className="grid gap-1.5">
-                          <Label className="text-xs">ElevenLabs Agent ID</Label>
-                          <Input value={tools.agentId ?? ""} onChange={(e) => setTool("agentId", e.target.value)}
-                            placeholder="Paste your public Agent ID" className="text-xs" />
-                          <p className="text-[10px] text-muted-foreground">Required for live voice testing via WebRTC.</p>
+                          <Label className="text-xs">First Message</Label>
+                          <Input value={tools.firstMessage ?? ""} onChange={(e) => setTool("firstMessage", e.target.value)}
+                            placeholder="Hi! How can I help you today?" className="text-xs" />
+                          <p className="text-[10px] text-muted-foreground">The greeting your assistant says when a conversation starts.</p>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Max Duration (seconds)</Label>
+                          <Input type="number" value={tools.maxDuration ?? 300} onChange={(e) => setTool("maxDuration", Number(e.target.value))}
+                            className="text-xs" min={30} max={3600} />
                         </div>
                       </CardContent>
                     </Card>
@@ -498,7 +509,8 @@ export default function VoiceAgentStudio() {
                       language: activeAssistant.language,
                       conversationMode: activeAssistant.conversation_mode,
                       temperature: activeAssistant.temperature,
-                      agentId: (activeAssistant.tools as any)?.agentId as string | undefined,
+                      voiceId: activeAssistant.voice_id ?? undefined,
+                      voiceProvider: activeAssistant.voice_provider,
                     }
                   : null
               }

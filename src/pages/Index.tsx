@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,10 @@ import {
   ArrowRight,
 } from "lucide-react";
 
+import robotHead from "@/assets/robot-head.png";
+import frequencyWave from "@/assets/frequency-wave.png";
+
+/* ─── Data ─── */
 const features = [
   { icon: Bot, title: "Custom AI Agents", desc: "Build voice assistants with custom personalities, prompts, and behaviors tailored to your use case." },
   { icon: AudioWaveform, title: "Natural Voices", desc: "Choose from premium voice models with adjustable tone, speed, and emotion for lifelike conversations." },
@@ -33,18 +37,48 @@ const steps = [
 ];
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 24 },
   visible: (i: number) => ({
     opacity: 1, y: 0,
-    transition: { delay: i * 0.08, duration: 0.45, ease: [0.25, 0.1, 0.25, 1] as const },
+    transition: { delay: i * 0.1, duration: 0.6, ease: [0.25, 0.1, 0.25, 1] as const },
   }),
 };
 
+/* ─── Floating particles component ─── */
+const Particles = () => (
+  <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    {Array.from({ length: 30 }).map((_, i) => (
+      <div
+        key={i}
+        className="absolute rounded-full bg-primary/20"
+        style={{
+          width: `${2 + Math.random() * 4}px`,
+          height: `${2 + Math.random() * 4}px`,
+          left: `${Math.random() * 100}%`,
+          top: `${Math.random() * 100}%`,
+          animation: `float ${4 + Math.random() * 6}s ease-in-out infinite`,
+          animationDelay: `${Math.random() * 5}s`,
+          opacity: 0.3 + Math.random() * 0.5,
+        }}
+      />
+    ))}
+  </div>
+);
+
 const Index = () => {
   const heroRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
+
+  // Parallax transforms
+  const robotY = useTransform(scrollYProgress, [0, 0.3], [0, -120]);
+  const robotRotate = useTransform(scrollYProgress, [0, 0.5], [0, 15]);
+  const robotOpacity = useTransform(scrollYProgress, [0, 0.15, 0.4], [0.15, 0.3, 0.05]);
+  const waveX = useTransform(scrollYProgress, [0.1, 0.5], ["-10%", "10%"]);
+  const waveOpacity = useTransform(scrollYProgress, [0.05, 0.2, 0.5, 0.7], [0, 0.25, 0.25, 0]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-background">
+    <div ref={containerRef} className="min-h-screen overflow-x-hidden bg-background">
       {/* NAV */}
       <header className="sticky top-0 z-50 border-b border-border/40 glass">
         <div className="container flex h-14 items-center justify-between">
@@ -67,7 +101,7 @@ const Index = () => {
       </header>
 
       <main>
-        {/* HERO */}
+        {/* ═══ HERO ═══ */}
         <section
           ref={heroRef}
           className="relative overflow-hidden"
@@ -79,8 +113,30 @@ const Index = () => {
             el.style.setProperty("--my", `${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`);
           }}
         >
+          {/* Pointer glow */}
           <div className="pointer-events-none absolute inset-0 opacity-50" style={{ background: "radial-gradient(500px 280px at var(--mx, 50%) var(--my, 30%), hsl(180 100% 50% / 0.06), transparent 70%)" }} />
           <div className="pointer-events-none absolute inset-0 bg-hero" />
+
+          {/* Floating robot image - parallax */}
+          <motion.img
+            src={robotHead}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute -right-16 top-12 w-64 opacity-15 blur-[1px] sm:w-80 lg:w-96 lg:-right-8"
+            style={{ y: robotY, rotate: robotRotate, opacity: robotOpacity }}
+          />
+
+          {/* Floating frequency wave */}
+          <motion.img
+            src={frequencyWave}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute bottom-0 left-0 w-full opacity-0"
+            style={{ x: waveX, opacity: waveOpacity }}
+          />
+
+          {/* Particles */}
+          <Particles />
 
           <div className="container relative flex flex-col items-center px-4 py-20 text-center lg:py-32">
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
@@ -104,7 +160,7 @@ const Index = () => {
               <Button asChild variant="hero-outline" size="lg"><Link to="/app"><Mic className="h-4 w-4" /> Try Live Demo</Link></Button>
             </motion.div>
 
-            {/* Orb */}
+            {/* Hero Orb */}
             <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.7, delay: 0.5 }}
               className="relative mt-14 flex items-center justify-center">
               <div className="absolute h-52 w-52 rounded-full bg-primary/8 blur-3xl animate-orb-breathe" />
@@ -114,9 +170,38 @@ const Index = () => {
           </div>
         </section>
 
-        {/* FEATURES */}
-        <section id="features" className="border-t border-border/30 py-16 lg:py-24">
-          <div className="container px-4">
+        {/* ═══ STATS BAR ═══ */}
+        <section className="border-y border-border/30 bg-card/50">
+          <div className="container grid grid-cols-2 gap-4 px-4 py-8 sm:grid-cols-4">
+            {[
+              { val: "148M+", label: "API Calls" },
+              { val: "1.5M+", label: "Assistants Built" },
+              { val: "344K+", label: "Developers" },
+              { val: "<300ms", label: "Avg Latency" },
+            ].map((s, i) => (
+              <motion.div key={s.label} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}
+                className="text-center">
+                <p className="font-display text-2xl font-bold text-gradient sm:text-3xl">{s.val}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
+        {/* ═══ FEATURES ═══ */}
+        <section id="features" className="relative border-t border-border/30 py-16 lg:py-24 overflow-hidden">
+          {/* Background robot floating */}
+          <motion.img
+            src={robotHead}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute -left-20 top-1/2 -translate-y-1/2 w-72 opacity-[0.04] blur-[2px] lg:w-96"
+            animate={{ y: [0, -20, 0] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <Particles />
+
+          <div className="container relative px-4">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={fadeUp} custom={0} className="mb-12 text-center">
               <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Everything You Need</h2>
               <p className="mt-3 text-sm text-muted-foreground">A complete platform for building, testing, and deploying voice AI at scale.</p>
@@ -126,8 +211,8 @@ const Index = () => {
                 const Icon = f.icon;
                 return (
                   <motion.div key={f.title} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }} variants={fadeUp} custom={i}
-                    className="rounded-xl border border-border/40 bg-card p-5 shadow-card transition-all duration-300 hover:border-primary/15 hover:shadow-glow">
-                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-primary">
+                    className="group rounded-xl border border-border/40 bg-card p-5 shadow-card transition-all duration-300 hover:border-primary/15 hover:shadow-glow">
+                    <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-primary transition-transform group-hover:scale-110">
                       <Icon className="h-4 w-4" />
                     </div>
                     <h3 className="font-display text-sm font-semibold">{f.title}</h3>
@@ -139,9 +224,19 @@ const Index = () => {
           </div>
         </section>
 
-        {/* HOW IT WORKS */}
-        <section id="how-it-works" className="border-t border-border/30 py-16 lg:py-24">
-          <div className="container px-4">
+        {/* ═══ HOW IT WORKS ═══ */}
+        <section id="how-it-works" className="relative border-t border-border/30 py-16 lg:py-24 overflow-hidden">
+          {/* Background frequency wave */}
+          <motion.img
+            src={frequencyWave}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute bottom-0 left-0 w-full opacity-[0.08]"
+            animate={{ x: ["-5%", "5%", "-5%"] }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          />
+
+          <div className="container relative px-4">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={fadeUp} custom={0} className="mb-12 text-center">
               <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">How It Works</h2>
               <p className="mt-3 text-sm text-muted-foreground">Four steps to your first voice agent.</p>
@@ -151,9 +246,9 @@ const Index = () => {
                 const Icon = s.icon;
                 return (
                   <motion.div key={s.num} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }} variants={fadeUp} custom={i}
-                    className="rounded-xl border border-border/40 bg-card p-5 shadow-card">
-                    <span className="font-display text-3xl font-bold text-primary/15">{s.num}</span>
-                    <div className="mt-3 mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary">
+                    className="group rounded-xl border border-border/40 bg-card p-5 shadow-card transition-all duration-300 hover:border-primary/15">
+                    <span className="font-display text-3xl font-bold text-primary/15 transition-colors group-hover:text-primary/30">{s.num}</span>
+                    <div className="mt-3 mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary transition-transform group-hover:scale-110">
                       <Icon className="h-4 w-4" />
                     </div>
                     <h3 className="font-display text-sm font-semibold">{s.title}</h3>
@@ -165,8 +260,51 @@ const Index = () => {
           </div>
         </section>
 
-        {/* CTA */}
-        <section id="cta" className="border-t border-border/30 py-16 lg:py-24">
+        {/* ═══ IMMERSIVE SECTION ═══ */}
+        <section className="relative border-t border-border/30 py-20 lg:py-32 overflow-hidden">
+          {/* Full-screen robot background */}
+          <motion.img
+            src={robotHead}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] opacity-[0.06] lg:w-[700px]"
+            animate={{ scale: [1, 1.05, 1], rotate: [0, 3, -3, 0] }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          />
+          {/* Frequency overlay */}
+          <motion.img
+            src={frequencyWave}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-0 -translate-y-1/2 w-full opacity-[0.12]"
+            animate={{ x: ["0%", "-8%", "0%"] }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <Particles />
+
+          <div className="container relative px-4">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={fadeUp} custom={0}
+              className="mx-auto max-w-2xl text-center">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/5 px-3 py-1 text-xs text-accent">
+                <Zap className="h-3 w-3" /> Powered by AI
+              </div>
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
+                The Future of <span className="text-gradient">Voice Interaction</span>
+              </h2>
+              <p className="mt-4 text-sm text-muted-foreground sm:text-base">
+                Build assistants that don't just respond — they understand context, take actions, and learn from every conversation.
+                Connect any LLM, any voice provider, any tool.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                <Button asChild variant="hero" size="lg"><Link to="/app">Open Studio <ArrowRight className="h-4 w-4" /></Link></Button>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ═══ CTA ═══ */}
+        <section id="cta" className="relative border-t border-border/30 py-16 lg:py-24 overflow-hidden">
+          <Particles />
           <div className="container px-4">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={fadeUp} custom={0} className="mx-auto max-w-lg text-center">
               <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Ready to Build?</h2>
