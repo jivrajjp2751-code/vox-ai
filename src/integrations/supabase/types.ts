@@ -14,7 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      voice_assistants: {
+        Row: {
+          conversation_mode: string
+          created_at: string
+          description: string | null
+          id: string
+          language: string
+          name: string
+          system_prompt: string
+          temperature: number
+          tools: Json
+          updated_at: string
+          user_id: string
+          voice_id: string | null
+          voice_provider: string
+          voice_speed: number
+        }
+        Insert: {
+          conversation_mode?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          language?: string
+          name: string
+          system_prompt?: string
+          temperature?: number
+          tools?: Json
+          updated_at?: string
+          user_id: string
+          voice_id?: string | null
+          voice_provider?: string
+          voice_speed?: number
+        }
+        Update: {
+          conversation_mode?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          language?: string
+          name?: string
+          system_prompt?: string
+          temperature?: number
+          tools?: Json
+          updated_at?: string
+          user_id?: string
+          voice_id?: string | null
+          voice_provider?: string
+          voice_speed?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
