@@ -11,7 +11,21 @@ const app = express();
 const PORT = process.env.PORT || process.env.SERVER_PORT || 5000;
 const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://127.0.0.1:27017/voxai';
 
+// Global error handlers
+process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('UNHANDLED REJECTION:', reason);
+});
+
 // Middleware
+app.use((req, res, next) => {
+    console.log(`[Request] ${req.method} ${req.url}`);
+    next();
+});
+
 app.use(cors({
     origin: '*', // Allow all origins (dev mode)
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -23,11 +37,15 @@ app.use(express.json());
 import publicApiRoutes from './routes/public_api.js';
 import otpRoutes from './routes/otp.js';
 
-app.use('/api/auth', authRoutes);
-app.use('/api/assistants', assistantRoutes);
-app.use('/api/voice-chat', voiceChatRoutes);
-app.use('/api/otp', otpRoutes);
-app.use('/api/public', publicApiRoutes);
+try {
+    app.use('/api/auth', authRoutes);
+    app.use('/api/assistants', assistantRoutes);
+    app.use('/api/voice-chat', voiceChatRoutes);
+    app.use('/api/otp', otpRoutes);
+    app.use('/api/public', publicApiRoutes);
+} catch (routeError) {
+    console.error('Error mounting routes:', routeError);
+}
 
 // Health check
 app.get('/api/health', (_req, res) => {
@@ -52,14 +70,32 @@ if (process.env.NODE_ENV === 'production') {
     });
 }
 
+// Global Express Error Handler
+app.use((err, req, res, next) => {
+    console.error('Express Error:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+});
 
 // Connect to MongoDB asynchronously
-mongoose
-    .connect(MONGO_URI)
-    .then(() => console.log('✅ Connected to MongoDB'))
-    .catch((err) => console.error('❌ MongoDB connection error:', err.message));
+try {
+    console.log('Connecting to MongoDB...');
+    mongoose
+        .connect(MONGO_URI)
+        .then(() => console.log('✅ Connected to MongoDB'))
+        .catch((err) => console.error('❌ MongoDB connection error:', err.message));
+} catch (dbError) {
+    console.error('Synchronous DB connect error:', dbError);
+}
 
 // Start server immediately (required for Railway health checks)
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-});
+try {
+    const server = app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+    });
+
+    server.on('error', (e) => {
+        console.error('Server listen error:', e);
+    });
+} catch (listenError) {
+    console.error('Failed to start server:', listenError);
+}
