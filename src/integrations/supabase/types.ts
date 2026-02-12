@@ -40,6 +40,7 @@ export type Database = {
       }
       voice_assistants: {
         Row: {
+          api_key: string
           conversation_mode: string
           created_at: string
           description: string | null
@@ -56,6 +57,7 @@ export type Database = {
           voice_speed: number
         }
         Insert: {
+          api_key?: string
           conversation_mode?: string
           created_at?: string
           description?: string | null
@@ -72,6 +74,7 @@ export type Database = {
           voice_speed?: number
         }
         Update: {
+          api_key?: string
           conversation_mode?: string
           created_at?: string
           description?: string | null
