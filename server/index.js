@@ -8,7 +8,7 @@ import assistantRoutes from './routes/assistants.js';
 import voiceChatRoutes from './routes/voiceChat.js';
 
 const app = express();
-const PORT = process.env.SERVER_PORT || 5000;
+const PORT = process.env.PORT || process.env.SERVER_PORT || 5000;
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/voxai';
 
 // Middleware
@@ -33,6 +33,25 @@ app.use('/api/public', publicApiRoutes);
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
 });
+
+// Serve Frontend in Production
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+if (process.env.NODE_ENV === 'production') {
+    // Serve static files from the React app
+    app.use(express.static(path.join(__dirname, '../dist')));
+
+    // The "catchall" handler: for any request that doesn't
+    // match one above, send back React's index.html file.
+    app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, '../dist/index.html'));
+    });
+}
+
 
 // Connect to MongoDB and start server
 mongoose
