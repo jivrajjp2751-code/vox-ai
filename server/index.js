@@ -53,19 +53,13 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 
-// Connect to MongoDB and start server
+// Connect to MongoDB asynchronously
 mongoose
     .connect(MONGO_URI)
-    .then(() => {
-        console.log('✅ Connected to MongoDB');
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-        });
-    })
-    .catch((err) => {
-        console.error('❌ MongoDB connection error:', err.message);
-        // Start server anyway so frontend doesn't break completely (just API will fail)
-        app.listen(PORT, () => {
-            console.log(`⚠️ Server running (without DB) on http://localhost:${PORT}`);
-        });
-    });
+    .then(() => console.log('✅ Connected to MongoDB'))
+    .catch((err) => console.error('❌ MongoDB connection error:', err.message));
+
+// Start server immediately (required for Railway health checks)
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+});
