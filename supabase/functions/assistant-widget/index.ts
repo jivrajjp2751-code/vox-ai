@@ -52,8 +52,8 @@ serve(async (req) => {
         });
       }
 
-      const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-      if (!lovableApiKey) throw new Error("LOVABLE_API_KEY not configured");
+      const antigravityApiKey = Deno.env.get("ANTIGRAVITY_API_KEY");
+      if (!antigravityApiKey) throw new Error("ANTIGRAVITY_API_KEY not configured");
 
       const messages = [
         { role: "system", content: assistant.system_prompt || "You are a helpful voice assistant." },
@@ -61,10 +61,10 @@ serve(async (req) => {
         { role: "user", content: userMessage },
       ];
 
-      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const aiResponse = await fetch("https://ai.gateway.antigravity.dev/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${lovableApiKey}`,
+          Authorization: `Bearer ${antigravityApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
