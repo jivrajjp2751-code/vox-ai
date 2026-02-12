@@ -9,7 +9,7 @@ import voiceChatRoutes from './routes/voiceChat.js';
 
 const app = express();
 const PORT = process.env.PORT || process.env.SERVER_PORT || 5000;
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/voxai';
+const MONGO_URI = process.env.MONGODB_URI || process.env.MONGO_URL || 'mongodb://127.0.0.1:27017/voxai';
 
 // Middleware
 app.use(cors({
