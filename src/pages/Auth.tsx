@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { auth } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { AudioWaveform, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 
 const authSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -31,12 +32,13 @@ export default function Auth() {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login: contextLogin, user } = useAuth();
 
   useEffect(() => {
-    auth.getSession().then(({ session }) => {
-      if (session) navigate("/app", { replace: true });
-    });
-  }, [navigate]);
+    if (user) {
+      navigate("/app", { replace: true });
+    }
+  }, [user, navigate]);
 
   const form = useForm<AuthValues>({
     resolver: zodResolver(authSchema),
@@ -48,11 +50,19 @@ export default function Auth() {
     setLoading(true);
     try {
       if (tab === "login") {
-        await auth.signIn(values.email, values.password, rememberMe);
+        const data = await apiFetch<{ user: any, token: string }>('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email: values.email, password: values.password }),
+        });
+        contextLogin(data.token, data.user);
         toast({ title: "Welcome back!", description: "Accessing your business dashboard..." });
         navigate("/app", { replace: true });
       } else {
-        await auth.signUp(values.email, values.password, values.displayName?.trim(), rememberMe);
+        const data = await apiFetch<{ user: any, token: string }>('/auth/signup', {
+          method: 'POST',
+          body: JSON.stringify({ email: values.email, password: values.password, displayName: values.displayName?.trim() }),
+        });
+        contextLogin(data.token, data.user);
         toast({ title: "Success!", description: "Your business account has been created." });
         navigate("/app", { replace: true });
       }

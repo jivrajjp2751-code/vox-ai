@@ -1,11 +1,12 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, MicOff, Phone, PhoneOff, Sparkles, Volume2 } from "lucide-react";
-import { voiceChat } from "@/integrations/supabase/client";
+import { voiceChat } from "@/lib/vox-api";
+import { API_URL } from "@/lib/api";
 
 export type PlaygroundAssistant = {
   name: string;
@@ -22,10 +23,11 @@ type Message = { role: "user" | "assistant"; text: string };
 export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant | null }) {
   const { toast } = useToast();
   const reduceMotion = useReducedMotion();
-  const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
+  const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "speaking" | "error">("idle");
   const [messages, setMessages] = useState<Message[]>([]);
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const messagesRef = useRef<Message[]>([]);
 
   // Keep a ref in sync so the callbacks always have latest messages
@@ -36,14 +38,76 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
       case "listening": return "Listening…";
       case "thinking": return "Thinking…";
       case "speaking": return "Speaking…";
+      case "error": return "Error";
       default: return "Ready to talk";
     }
   }, [status]);
 
-  const speak = useCallback((text: string) => {
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
+  const speak = useCallback(async (text: string) => {
+    // Stop any current audio
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
 
+    // Check if we should use server-side TTS (ElevenLabs / OpenAI)
+    if (assistant?.voiceProvider && assistant.voiceProvider !== 'browser') {
+      try {
+        setStatus("speaking");
+        const res = await fetch(`${API_URL}/voice-chat/tts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            voiceId: assistant.voiceId,
+            voiceProvider: assistant.voiceProvider
+          })
+        });
+
+        if (!res.ok) {
+          if (res.status === 404) {
+            setStatus("error");
+            throw new Error("Server Outdated: Restart npm run server");
+          }
+          throw new Error(await res.text());
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+
+        audio.onended = () => {
+          setStatus("idle");
+          URL.revokeObjectURL(url);
+          audioRef.current = null;
+        };
+        audio.onerror = () => {
+          setStatus("idle");
+          toast({ variant: "destructive", title: "Audio Error", description: "Failed to play audio." });
+          audioRef.current = null;
+        };
+
+        try {
+          await audio.play();
+        } catch (e) {
+          console.error("Autoplay failed:", e);
+        }
+        return;
+      } catch (e) {
+        console.error("Server TTS failed, falling back to browser:", e);
+        const msg = e instanceof Error ? e.message : "TTS Failed";
+        toast({
+          variant: "destructive",
+          title: "TTS Error",
+          description: msg.includes("Restart") ? msg : "Using browser voice as fallback."
+        });
+        // Fall through to browser logic
+      }
+    }
+
+    // Fallback: Browser Speech Synthesis
     if (!("speechSynthesis" in window)) {
       setStatus("idle");
       return;
@@ -51,8 +115,6 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = assistant?.language ?? "en";
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
     utterance.volume = 1.0;
     synthRef.current = utterance;
 
@@ -63,12 +125,10 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
     };
 
     setStatus("speaking");
+    setTimeout(() => window.speechSynthesis.speak(utterance), 50);
+  }, [assistant?.voiceProvider, assistant?.voiceId, assistant?.language, toast]);
 
-    // Small delay to ensure synthesis is ready (Chrome quirk)
-    setTimeout(() => {
-      window.speechSynthesis.speak(utterance);
-    }, 50);
-  }, [assistant?.language]);
+
 
   const getAIResponse = useCallback(async (userText: string) => {
     setStatus("thinking");
@@ -150,7 +210,11 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
 
   const stopTalking = useCallback(() => {
     recognitionRef.current?.abort();
-    window.speechSynthesis.cancel();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
     setStatus("idle");
   }, []);
 
@@ -178,6 +242,12 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
         {assistant?.voiceId && (
           <div className="rounded-md border border-border/20 bg-secondary/20 px-3 py-1.5 text-[10px] text-muted-foreground truncate">
             Voice: {assistant.voiceId}
+          </div>
+        )}
+
+        {status === "error" && (
+          <div className="rounded-md bg-destructive/10 p-2 text-center text-xs font-bold text-destructive">
+            Server Update Required! Restart `npm run server`
           </div>
         )}
 
@@ -221,7 +291,7 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
             <Phone className="h-3.5 w-3.5" /> Talk to Assistant
           </Button>
         )}
-        <p className="text-center text-[10px] text-muted-foreground">Uses browser speech recognition & synthesis. Works best in Chrome.</p>
+        <p className="text-center text-[10px] text-muted-foreground">Uses AI voice synthesis & browser speech recognition.</p>
       </CardContent>
     </Card>
   );

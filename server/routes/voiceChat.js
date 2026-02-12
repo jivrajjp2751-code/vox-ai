@@ -55,4 +55,102 @@ router.post('/', async (req, res) => {
     }
 });
 
+router.post('/tts', async (req, res) => {
+    try {
+        const { text, voiceId, voiceProvider } = req.body;
+
+        if (!text) return res.status(400).json({ error: 'Text required' });
+
+        // 1. OpenAI TTS
+        if (voiceProvider === 'openai-tts') {
+            const apiKey = process.env.OPENAI_API_KEY;
+            if (!apiKey) return res.status(500).json({ error: 'OpenAI API Key missing' });
+
+            const response = await fetch('https://api.openai.com/v1/audio/speech', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'tts-1',
+                    input: text,
+                    voice: voiceId || 'alloy',
+                }),
+            });
+
+            if (!response.ok) throw new Error(`OpenAI TTS error: ${response.statusText}`);
+
+            // Stream audio back
+            const buffer = await response.arrayBuffer();
+            res.set('Content-Type', 'audio/mpeg');
+            res.send(Buffer.from(buffer));
+            return;
+        }
+
+        // 2. ElevenLabs TTS with Fallback
+        if (voiceProvider === 'elevenlabs') {
+            const apiKey = process.env.ELEVENLABS_API_KEY;
+            const voice = voiceId || 'JBFqnCBsd6RMkjVDRZzb';
+
+            // If no ElevenLabs key, fallback to OpenAI if available
+            if (!apiKey) {
+                if (process.env.OPENAI_API_KEY) {
+                    console.warn("[TTS] Missing ELEVENLABS_API_KEY, falling back to OpenAI TTS");
+                    const oaKey = process.env.OPENAI_API_KEY;
+                    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${oaKey}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            model: 'tts-1',
+                            input: text,
+                            voice: 'alloy', // Fallback voice
+                        }),
+                    });
+
+                    if (!response.ok) throw new Error(`OpenAI TTS fallback error: ${response.statusText}`);
+                    const buffer = await response.arrayBuffer();
+                    res.set('Content-Type', 'audio/mpeg');
+                    res.send(Buffer.from(buffer));
+                    return;
+                }
+                return res.status(500).json({ error: 'ElevenLabs API Key missing (and no OpenAI fallback)' });
+            }
+
+            const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+                method: 'POST',
+                headers: {
+                    'xi-api-key': apiKey,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text,
+                    model_id: 'eleven_monolingual_v1',
+                    voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+                }),
+            });
+
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(`ElevenLabs error: ${err}`);
+            }
+
+            const buffer = await response.arrayBuffer();
+            res.set('Content-Type', 'audio/mpeg');
+            res.send(Buffer.from(buffer));
+            return;
+        }
+
+        // 3. Fallback / Unknown provider
+        res.status(400).json({ error: 'Unsupported voice provider' });
+
+    } catch (err) {
+        console.error('TTS Error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 export default router;

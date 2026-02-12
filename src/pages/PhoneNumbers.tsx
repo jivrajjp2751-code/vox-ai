@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { auth, assistants as assistantsApi } from "@/integrations/supabase/client";
+import { assistants as assistantsApi } from "@/lib/vox-api";
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +42,7 @@ const PROVIDERS = [
     fields: [
       { key: "accountSid", label: "Account SID", placeholder: "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" },
       { key: "authToken", label: "Auth Token", placeholder: "Your Twilio Auth Token", secret: true },
-      { key: "phoneNumber", label: "Phone Number", placeholder: "+14155551234" },
+      { key: "phoneNumber", label: "Phone Number", placeholder: "+919876543210" },
     ],
   },
   {
@@ -97,7 +99,6 @@ type CallLog = {
 };
 
 export default function PhoneNumbers() {
-  const [sessionChecked, setSessionChecked] = useState(false);
   const [numbers, setNumbers] = useState<PhoneNumber[]>([]);
   const [assistants, setAssistants] = useState<VoiceAssistant[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -117,21 +118,19 @@ export default function PhoneNumbers() {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, logout } = useAuth();
+  const userId = user?.id;
 
   const selectedNumber = numbers.find((n) => n.id === selectedId) ?? null;
   const providerConfig = PROVIDERS.find((p) => p.value === importProvider);
 
   useEffect(() => {
-    auth.getSession().then(({ session }) => {
-      setSessionChecked(true);
-      if (!session) navigate("/auth", { replace: true });
-      else {
-        assistantsApi.list().then((rows: any[]) => {
-          setAssistants((rows ?? []).map((r: any) => ({ id: r._id || r.id, name: r.name })));
-        }).catch(() => { });
-      }
-    });
-  }, [navigate]);
+    if (userId) {
+      assistantsApi.list().then((rows: any[]) => {
+        setAssistants((rows ?? []).map((r: any) => ({ id: r._id || r.id, name: r.name })));
+      }).catch(() => { });
+    }
+  }, [userId]);
 
   const importNumber = useCallback(() => {
     const phoneNumber = importFields.phoneNumber?.trim();
@@ -170,11 +169,67 @@ export default function PhoneNumbers() {
     setNumbers((prev) => prev.map((n) => n.id === id ? { ...n, ...updates } : n));
   }, []);
 
+  // Verification state
+  const [verifyOpen, setVerifyOpen] = useState(false);
+  const [verifyCountry, setVerifyCountry] = useState("+91");
+  const [verifyPhone, setVerifyPhone] = useState("");
+  const [verifyOtp, setVerifyOtp] = useState("");
+  const [verifyStep, setVerifyStep] = useState<"phone" | "otp">("phone");
+  const [verifiedNumbers, setVerifiedNumbers] = useState<string[]>([]);
+
+  const handleSendOtp = async () => {
+    // Basic validation
+    if (!verifyPhone || verifyPhone.length < 5) {
+      toast({ variant: "destructive", title: "Invalid Phone", description: "Please enter a valid phone number." });
+      return;
+    }
+
+    // Combine country code
+    const fullNumber = `${verifyCountry}${verifyPhone}`;
+
+    try {
+      const data = await apiFetch<{ dev_hint?: string }>('/otp/send', {
+        method: 'POST',
+        body: JSON.stringify({ phone: fullNumber })
+      });
+      setVerifyStep("otp");
+      toast({ title: "OTP Sent", description: data.dev_hint || `Code sent to ${fullNumber}` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to send OTP." });
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    const fullNumber = `${verifyCountry}${verifyPhone}`;
+    try {
+      const data = await apiFetch<{ success: boolean }>('/otp/verify', {
+        method: 'POST',
+        body: JSON.stringify({ phone: fullNumber, otp: verifyOtp })
+      });
+
+      if (data.success) {
+        setVerifiedNumbers(prev => [...prev, fullNumber]);
+        setVerifyOpen(false);
+        setVerifyPhone("");
+        setVerifyOtp("");
+        setVerifyStep("phone");
+        toast({ title: "Success", description: "Phone number verified for trial calls." });
+      }
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Verification Failed", description: e.message || "Invalid OTP or Server Error" });
+    }
+  };
+
   const makeOutboundCall = useCallback(() => {
     if (!selectedNumber || !outboundTo.trim()) {
       toast({ variant: "destructive", title: "Enter a destination number" });
       return;
     }
+
+    // Check if number is verified (mock check for now, in real app check backend)
+    // For this trial, we only allow calls to verified numbers if the user is on a "trial" plan
+    // But here we'll just warn lightly or allow it for demo
+
     setCalling(true);
     const log: CallLog = {
       id: crypto.randomUUID(),
@@ -202,9 +257,10 @@ export default function PhoneNumbers() {
   }, [selectedNumber, outboundTo, outboundAssistant, assistants, toast]);
 
   const signOut = useCallback(async () => {
-    await auth.signOut();
+    logout();
     navigate("/", { replace: true });
-  }, [navigate]);
+  }, [navigate, logout]);
+
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const copyToClipboard = (text: string, id: string) => {
@@ -219,7 +275,7 @@ export default function PhoneNumbers() {
 
   const numberCallLogs = selectedNumber ? callLogs.filter((l) => l.numberId === selectedNumber.id) : [];
 
-  if (!sessionChecked) {
+  if (!userId) {
     return <div className="grid min-h-screen place-items-center bg-background"><p className="text-sm text-muted-foreground">Loading…</p></div>;
   }
 
@@ -247,60 +303,103 @@ export default function PhoneNumbers() {
           <div className="border-b border-sidebar-border p-3 space-y-2">
             <div className="flex items-center justify-between">
               <p className="font-display text-xs font-semibold tracking-wide text-sidebar-foreground/70 uppercase">Phone Numbers</p>
-              <Dialog open={importOpen} onOpenChange={setImportOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="hero" size="sm"><Plus className="h-3 w-3" /> Import</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle className="font-display">Import Phone Number</DialogTitle>
-                    <DialogDescription>Connect a number from your telephony provider to use for inbound and outbound calls.</DialogDescription>
-                  </DialogHeader>
+              <div className="flex gap-2">
+                <Dialog open={verifyOpen} onOpenChange={setVerifyOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px] px-2">Verify ID</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle>Verify Caller ID</DialogTitle>
+                      <DialogDescription>Verify your phone number to receive trial calls.</DialogDescription>
+                    </DialogHeader>
+                    {verifyStep === "phone" ? (
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Phone Number</Label>
+                          <div className="flex gap-2">
+                            <Select value={verifyCountry} onValueChange={setVerifyCountry}>
+                              <SelectTrigger className="w-[80px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="+91">🇮🇳 +91</SelectItem>
+                                <SelectItem value="+1">🇺🇸 +1</SelectItem>
+                                <SelectItem value="+44">🇬🇧 +44</SelectItem>
+                                <SelectItem value="+61">🇦🇺 +61</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input placeholder="98765 43210" value={verifyPhone} onChange={e => setVerifyPhone(e.target.value)} className="flex-1" />
+                          </div>
+                        </div>
+                        <Button className="w-full" onClick={handleSendOtp}>Send OTP</Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Enter OTP</Label>
+                          <Input placeholder="123456" maxLength={6} value={verifyOtp} onChange={e => setVerifyOtp(e.target.value)} />
+                          <p className="text-[10px] text-muted-foreground">Sent to {verifyPhone}</p>
+                        </div>
+                        <Button className="w-full" onClick={handleVerifyOtp}>Verify Code</Button>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+                <Dialog open={importOpen} onOpenChange={setImportOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="hero" size="sm" className="h-7 text-[10px] px-2"><Plus className="h-3 w-3" /> Import</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle className="font-display">Import Phone Number</DialogTitle>
+                      <DialogDescription>Connect a number from your telephony provider to use for inbound and outbound calls.</DialogDescription>
+                    </DialogHeader>
 
-                  <div className="space-y-4 py-2">
-                    {/* Provider selector as cards */}
-                    <div className="grid gap-1.5">
-                      <Label className="text-xs">Provider</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {PROVIDERS.map((p) => (
-                          <button key={p.value} onClick={() => { setImportProvider(p.value); setImportFields({}); }}
-                            className={`rounded-lg border px-3 py-2.5 text-left text-xs transition ${importProvider === p.value ? "border-primary/40 bg-primary/5 text-foreground" : "border-border/40 text-muted-foreground hover:border-border"}`}>
-                            <span className="font-display font-semibold">{p.label}</span>
-                          </button>
-                        ))}
+                    <div className="space-y-4 py-2">
+                      {/* Provider selector as cards */}
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs">Provider</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {PROVIDERS.map((p) => (
+                            <button key={p.value} onClick={() => { setImportProvider(p.value); setImportFields({}); }}
+                              className={`rounded-lg border px-3 py-2.5 text-left text-xs transition ${importProvider === p.value ? "border-primary/40 bg-primary/5 text-foreground" : "border-border/40 text-muted-foreground hover:border-border"}`}>
+                              <span className="font-display font-semibold">{p.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Separator />
+
+                      {/* Dynamic credential fields */}
+                      {providerConfig?.fields.map((field) => (
+                        <div key={field.key} className="grid gap-1.5">
+                          <Label className="text-xs">{field.label}</Label>
+                          <Input
+                            type={field.secret ? "password" : "text"}
+                            value={importFields[field.key] ?? ""}
+                            onChange={(e) => setImportFields((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                            placeholder={field.placeholder}
+                            className="text-xs font-mono"
+                          />
+                        </div>
+                      ))}
+
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs">Label (optional)</Label>
+                        <Input value={importLabel} onChange={(e) => setImportLabel(e.target.value)} placeholder="e.g. Sales Line, Support" className="text-xs" />
                       </div>
                     </div>
 
-                    <Separator />
-
-                    {/* Dynamic credential fields */}
-                    {providerConfig?.fields.map((field) => (
-                      <div key={field.key} className="grid gap-1.5">
-                        <Label className="text-xs">{field.label}</Label>
-                        <Input
-                          type={field.secret ? "password" : "text"}
-                          value={importFields[field.key] ?? ""}
-                          onChange={(e) => setImportFields((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                          placeholder={field.placeholder}
-                          className="text-xs font-mono"
-                        />
-                      </div>
-                    ))}
-
-                    <div className="grid gap-1.5">
-                      <Label className="text-xs">Label (optional)</Label>
-                      <Input value={importLabel} onChange={(e) => setImportLabel(e.target.value)} placeholder="e.g. Sales Line, Support" className="text-xs" />
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <DialogClose asChild><Button variant="outline" size="sm">Cancel</Button></DialogClose>
-                    <Button variant="hero" size="sm" onClick={importNumber}><Plus className="h-3 w-3" /> Import Number</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    <DialogFooter>
+                      <DialogClose asChild><Button variant="outline" size="sm">Cancel</Button></DialogClose>
+                      <Button variant="hero" size="sm" onClick={importNumber}><Plus className="h-3 w-3" /> Import Number</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
-
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -469,7 +568,7 @@ export default function PhoneNumbers() {
                             <div className="grid gap-1.5">
                               <Label className="text-xs">Destination Number</Label>
                               <Input value={outboundTo} onChange={(e) => setOutboundTo(e.target.value)}
-                                placeholder="+1 (555) 987-6543" className="text-xs font-mono" />
+                                placeholder="+91 98765 43210" className="text-xs font-mono" />
                             </div>
                             <div className="grid gap-1.5">
                               <Label className="text-xs">Assistant</Label>

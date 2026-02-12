@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { auth, assistants as assistantsApi } from "@/integrations/supabase/client";
+import { assistants as assistantsApi } from "@/lib/vox-api";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,9 +114,6 @@ const FUNCTIONS = [
 ];
 
 export default function VoiceAgentStudio() {
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
   const [assistants, setAssistants] = useState<VoiceAssistantRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<VoiceAssistantRow>>(defaultAssistantDraft());
@@ -133,6 +131,8 @@ export default function VoiceAgentStudio() {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, logout } = useAuth();
+  const userId = user?.id;
 
   const activeAssistant = useMemo(() => assistants.find((a) => a.id === activeId) ?? null, [assistants, activeId]);
 
@@ -171,15 +171,10 @@ export default function VoiceAgentStudio() {
   }, [toast, activeId]);
 
   useEffect(() => {
-    auth.getSession().then(({ session }) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      setUserId(u?.id ?? null);
-      setSessionChecked(true);
-      if (!u?.id) navigate("/auth", { replace: true });
-      else load();
-    });
-  }, [navigate, load]);
+    if (userId) {
+      load();
+    }
+  }, [userId, load]);
 
   useEffect(() => {
     if (!activeAssistant) return;
@@ -286,11 +281,11 @@ Guidelines:
   }, [activeId, draft, toast, load]);
 
   const signOut = useCallback(async () => {
-    await auth.signOut();
+    logout();
     navigate("/", { replace: true });
-  }, [navigate]);
+  }, [navigate, logout]);
 
-  if (!sessionChecked) {
+  if (!userId) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
         <p className="text-sm text-muted-foreground">Loading studio…</p>
@@ -638,19 +633,15 @@ Guidelines:
           {/* Voice playground sidebar */}
           <aside className="w-full shrink-0 overflow-y-auto border-t border-sidebar-border bg-sidebar p-4 lg:w-80 lg:border-t-0 lg:border-l lg:p-4">
             <VoicePlayground
-              assistant={
-                activeAssistant
-                  ? {
-                    name: activeAssistant.name,
-                    systemPrompt: activeAssistant.system_prompt,
-                    language: activeAssistant.language,
-                    conversationMode: activeAssistant.conversation_mode,
-                    temperature: activeAssistant.temperature,
-                    voiceId: activeAssistant.voice_id ?? undefined,
-                    voiceProvider: activeAssistant.voice_provider,
-                  }
-                  : null
-              }
+              assistant={{
+                name: draft.name ?? "New Assistant",
+                systemPrompt: draft.system_prompt ?? "",
+                language: draft.language ?? "en",
+                conversationMode: draft.conversation_mode ?? "friendly",
+                temperature: draft.temperature ?? 0.7,
+                voiceId: draft.voice_id ?? undefined,
+                voiceProvider: draft.voice_provider ?? "elevenlabs",
+              }}
             />
           </aside>
         </main>

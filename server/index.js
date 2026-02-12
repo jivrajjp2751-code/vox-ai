@@ -21,10 +21,12 @@ app.use(express.json());
 
 // Routes
 import publicApiRoutes from './routes/public_api.js';
+import otpRoutes from './routes/otp.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/assistants', assistantRoutes);
 app.use('/api/voice-chat', voiceChatRoutes);
+app.use('/api/otp', otpRoutes);
 app.use('/api/public', publicApiRoutes);
 
 // Health check

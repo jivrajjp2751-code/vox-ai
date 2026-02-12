@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import VoiceAgentStudio from "./pages/VoiceAgentStudio";
 import PhoneNumbers from "./pages/PhoneNumbers";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
 
@@ -17,18 +18,31 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/app" element={<VoiceAgentStudio />} />
-          <Route path="/phone-numbers" element={<PhoneNumbers />} />
-          <Route path="/studio" element={<Navigate to="/app" replace />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/app" element={<RequireAuth><VoiceAgentStudio /></RequireAuth>} />
+            <Route path="/phone-numbers" element={<RequireAuth><PhoneNumbers /></RequireAuth>} />
+            <Route path="/studio" element={<Navigate to="/app" replace />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
+
+import { useAuth } from "@/contexts/AuthContext";
+
+function RequireAuth({ children }: { children: JSX.Element }) {
+  const { user, loading } = useAuth();
+
+  if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
+  if (!user) return <Navigate to="/auth" replace />;
+
+  return children;
+}
 
 export default App;
