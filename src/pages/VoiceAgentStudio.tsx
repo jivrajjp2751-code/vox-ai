@@ -20,7 +20,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 
 import { VoicePlayground } from "@/components/voice/VoicePlayground";
-import { Mic, Plus, Save, LogOut, Sparkles, Trash2, Brain, AudioWaveform, Languages, Wrench, Volume2, Phone } from "lucide-react";
+import { Mic, Plus, Save, LogOut, Sparkles, Trash2, Brain, AudioWaveform, Languages, Wrench, Volume2, Phone, Copy, Check, Code2, Key } from "lucide-react";
 import voxaiLogo from "@/assets/voxai-logo.png";
 
 type VoiceAssistantRow = {
@@ -36,6 +36,7 @@ type VoiceAssistantRow = {
   voice_id: string | null;
   voice_speed: number;
   tools: any;
+  api_key: string;
   created_at: string;
   updated_at: string;
 };
@@ -120,6 +121,7 @@ export default function VoiceAgentStudio() {
   const [draft, setDraft] = useState<Partial<VoiceAssistantRow>>(defaultAssistantDraft());
   const [loading, setLoading] = useState(false);
   const [builderTab, setBuilderTab] = useState("model");
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -129,6 +131,12 @@ export default function VoiceAgentStudio() {
   const tools = useMemo(() => (draft.tools ?? {}) as Record<string, any>, [draft.tools]);
   const setTool = useCallback((key: string, val: any) => {
     setDraft((p) => ({ ...p, tools: { ...(p.tools ?? {}), [key]: val } }));
+  }, []);
+
+  const copyText = useCallback((text: string, field: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   }, []);
 
   const load = useCallback(async (uid: string) => {
@@ -233,6 +241,8 @@ export default function VoiceAgentStudio() {
     navigate("/", { replace: true });
   }, [navigate]);
 
+  const widgetBaseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/assistant-widget`;
+
   if (!sessionChecked) {
     return (
       <div className="grid min-h-screen place-items-center bg-background">
@@ -277,6 +287,7 @@ export default function VoiceAgentStudio() {
                       className={`w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-secondary/60 ${a.id === activeId ? "bg-secondary text-secondary-foreground" : "text-muted-foreground"}`}>
                       <p className="font-display text-xs font-medium truncate">{a.name}</p>
                       <p className="mt-0.5 text-[10px] text-muted-foreground truncate">{a.conversation_mode} · {a.language}</p>
+                      <p className="mt-0.5 text-[9px] font-mono text-muted-foreground/60 truncate">{a.id.slice(0, 8)}…</p>
                     </button>
                   ))}
                 </div>
@@ -316,12 +327,13 @@ export default function VoiceAgentStudio() {
 
                 {/* Tabbed builder — Vapi style */}
                 <Tabs value={builderTab} onValueChange={setBuilderTab}>
-                  <TabsList className="mb-4 grid w-full grid-cols-5">
+                  <TabsList className="mb-4 grid w-full grid-cols-6">
                     <TabsTrigger value="model" className="gap-1.5 text-xs"><Brain className="h-3 w-3" /> Model</TabsTrigger>
                     <TabsTrigger value="voice" className="gap-1.5 text-xs"><AudioWaveform className="h-3 w-3" /> Voice</TabsTrigger>
                     <TabsTrigger value="transcriber" className="gap-1.5 text-xs"><Languages className="h-3 w-3" /> Transcriber</TabsTrigger>
                     <TabsTrigger value="functions" className="gap-1.5 text-xs"><Wrench className="h-3 w-3" /> Functions</TabsTrigger>
                     <TabsTrigger value="advanced" className="gap-1.5 text-xs"><Sparkles className="h-3 w-3" /> Advanced</TabsTrigger>
+                    <TabsTrigger value="integrate" className="gap-1.5 text-xs"><Code2 className="h-3 w-3" /> Integrate</TabsTrigger>
                   </TabsList>
 
                   {/* MODEL TAB */}
@@ -502,6 +514,135 @@ export default function VoiceAgentStudio() {
                           <Label className="text-xs">Max Duration (seconds)</Label>
                           <Input type="number" value={tools.maxDuration ?? 300} onChange={(e) => setTool("maxDuration", Number(e.target.value))}
                             className="text-xs" min={30} max={3600} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  {/* INTEGRATE TAB */}
+                  <TabsContent value="integrate" className="space-y-4">
+                    {/* Credentials Card */}
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm flex items-center gap-2"><Key className="h-4 w-4" /> Credentials</CardTitle>
+                        <CardDescription className="text-xs">Use these credentials to integrate this assistant into your website or app.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Assistant ID</Label>
+                          <div className="flex items-center gap-2">
+                            <Input value={activeAssistant?.id ?? ""} readOnly className="text-xs font-mono bg-secondary/30" />
+                            <Button variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={() => copyText(activeAssistant?.id ?? "", "id")}>
+                              {copiedField === "id" ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">API Key</Label>
+                          <div className="flex items-center gap-2">
+                            <Input value={activeAssistant?.api_key ?? ""} readOnly className="text-xs font-mono bg-secondary/30" />
+                            <Button variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={() => copyText(activeAssistant?.api_key ?? "", "apikey")}>
+                              {copiedField === "apikey" ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Keep this secret. Use it server-side or in your widget embed.</p>
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">API Endpoint</Label>
+                          <div className="flex items-center gap-2">
+                            <Input value={widgetBaseUrl} readOnly className="text-xs font-mono bg-secondary/30" />
+                            <Button variant="outline" size="icon" className="shrink-0 h-9 w-9" onClick={() => copyText(widgetBaseUrl, "endpoint")}>
+                              {copiedField === "endpoint" ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Quick Start API */}
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm flex items-center gap-2"><Code2 className="h-4 w-4" /> Quick Start — REST API</CardTitle>
+                        <CardDescription className="text-xs">Send a message to your assistant via HTTP POST. Works from any language.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="relative">
+                          <pre className="overflow-x-auto rounded-lg bg-secondary/50 border border-border/30 p-3 text-[10px] font-mono leading-relaxed text-foreground">
+{`// Chat with your assistant
+const response = await fetch(
+  "${widgetBaseUrl}?apiKey=${activeAssistant?.api_key ?? "YOUR_API_KEY"}",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userMessage: "Hello, how are you?",
+      conversationHistory: [] // previous messages
+    })
+  }
+);
+
+const data = await response.json();
+console.log(data.reply);
+// => "Hi! I'm ${activeAssistant?.name ?? "your assistant"}. How can I help?"`}
+                          </pre>
+                          <Button variant="ghost" size="icon" className="absolute right-2 top-2 h-6 w-6"
+                            onClick={() => copyText(`const response = await fetch("${widgetBaseUrl}?apiKey=${activeAssistant?.api_key ?? "YOUR_API_KEY"}", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userMessage: "Hello", conversationHistory: [] }) }); const data = await response.json();`, "api-snippet")}>
+                            {copiedField === "api-snippet" ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Embed Widget */}
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm flex items-center gap-2"><Code2 className="h-4 w-4" /> Embed Widget</CardTitle>
+                        <CardDescription className="text-xs">Paste this snippet into your website's HTML to add a chat widget.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="relative">
+                          <pre className="overflow-x-auto rounded-lg bg-secondary/50 border border-border/30 p-3 text-[10px] font-mono leading-relaxed text-foreground">
+{`<!-- VOXAI Voice Widget -->
+<script>
+  window.VOXAI_CONFIG = {
+    assistantId: "${activeAssistant?.id ?? ""}",
+    apiKey: "${activeAssistant?.api_key ?? ""}",
+    endpoint: "${widgetBaseUrl}",
+    position: "bottom-right",
+    theme: "dark",
+    greeting: "${(tools.firstMessage as string) || "Hi! How can I help you?"}"
+  };
+</script>
+<script src="${window.location.origin}/widget.js" async></script>`}
+                          </pre>
+                          <Button variant="ghost" size="icon" className="absolute right-2 top-2 h-6 w-6"
+                            onClick={() => copyText(`<script>\n  window.VOXAI_CONFIG = {\n    assistantId: "${activeAssistant?.id ?? ""}",\n    apiKey: "${activeAssistant?.api_key ?? ""}",\n    endpoint: "${widgetBaseUrl}",\n    position: "bottom-right",\n    theme: "dark"\n  };\n</script>\n<script src="${window.location.origin}/widget.js" async></script>`, "embed")}>
+                            {copiedField === "embed" ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* cURL Example */}
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-display text-sm flex items-center gap-2"><Code2 className="h-4 w-4" /> cURL Example</CardTitle>
+                        <CardDescription className="text-xs">Test your assistant from the command line.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="relative">
+                          <pre className="overflow-x-auto rounded-lg bg-secondary/50 border border-border/30 p-3 text-[10px] font-mono leading-relaxed text-foreground">
+{`curl -X POST "${widgetBaseUrl}?apiKey=${activeAssistant?.api_key ?? "YOUR_API_KEY"}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "userMessage": "What can you do?",
+    "conversationHistory": []
+  }'`}
+                          </pre>
+                          <Button variant="ghost" size="icon" className="absolute right-2 top-2 h-6 w-6"
+                            onClick={() => copyText(`curl -X POST "${widgetBaseUrl}?apiKey=${activeAssistant?.api_key ?? "YOUR_API_KEY"}" -H "Content-Type: application/json" -d '{"userMessage":"What can you do?","conversationHistory":[]}'`, "curl")}>
+                            {copiedField === "curl" ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>

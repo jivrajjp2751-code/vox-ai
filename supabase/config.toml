@@ -2,3 +2,6 @@ project_id = "hlhcjxrleqxxvgudcbib"
 
 [functions.voice-chat]
 verify_jwt = false
+
+[functions.assistant-widget]
+verify_jwt = false
