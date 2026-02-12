@@ -2,60 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 @layer base {
   :root {
-    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+    /* Premium Dark AI Theme (Vapi/Bolna Style) */
+    --background: 240 10% 3.9%;
+    /* #09090b */
+    --foreground: 0 0% 98%;
+    /* #fafafa */
 
-    --background: 280 20% 4%;
-    --foreground: 0 0% 95%;
+    --card: 240 10% 3.9%;
+    /* Match background for seamless look, or slightly lighter */
+    --card-foreground: 0 0% 98%;
 
-    --card: 280 18% 7%;
-    --card-foreground: 0 0% 95%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
 
-    --popover: 280 18% 8%;
-    --popover-foreground: 0 0% 95%;
+    /* Neon Violet/Indigo Primary */
+    --primary: 262.1 83.3% 57.8%;
+    /* #7c3aed (Violet-600) */
+    --primary-foreground: 210 40% 98%;
 
-    --primary: 330 100% 64%;
-    --primary-foreground: 280 20% 4%;
+    /* Darker Secondary for Cards/Surfaces */
+    --secondary: 240 3.7% 15.9%;
+    /* #27272a (Zinc-800) */
+    --secondary-foreground: 0 0% 98%;
 
-    --secondary: 280 18% 12%;
-    --secondary-foreground: 0 0% 88%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
 
-    --muted: 280 14% 14%;
-    --muted-foreground: 280 10% 55%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
 
-    --accent: 300 80% 65%;
-    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
 
-    --border: 280 14% 16%;
-    --input: 280 14% 16%;
-    --ring: 330 100% 64%;
+    --radius: 0.5rem;
 
-    --radius: 0.75rem;
-
-    --gradient-hero: radial-gradient(800px 400px at 50% 0%, hsl(330 100% 64% / 0.08), transparent 70%);
-    --gradient-mesh: radial-gradient(600px 360px at 30% 20%, hsl(330 100% 64% / 0.1), transparent 60%),
-      radial-gradient(520px 340px at 70% 70%, hsl(300 80% 65% / 0.06), transparent 60%);
-    --gradient-text: linear-gradient(135deg, hsl(300 80% 70%), hsl(330 100% 68%));
-
-    --shadow-pop: 0 4px 20px -6px hsl(0 0% 0% / 0.5);
-    --shadow-glow: 0 0 30px -8px hsl(330 100% 64% / 0.35);
-    --shadow-card: 0 1px 0 0 hsl(0 0% 100% / 0.03) inset, 0 4px 16px -6px hsl(0 0% 0% / 0.4);
-
-    --sidebar-background: 280 20% 4%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 330 100% 64%;
-    --sidebar-primary-foreground: 280 20% 4%;
-    --sidebar-accent: 280 18% 12%;
-    --sidebar-accent-foreground: 0 0% 88%;
-    --sidebar-border: 280 14% 16%;
-    --sidebar-ring: 330 100% 64%;
+    /* Sidebar Variables (Specific to Vapi-like generic layouts) */
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
@@ -64,32 +59,27 @@
     @apply border-border;
   }
 
-  html {
-    overflow-x: hidden;
-  }
-
   body {
-    font-family: var(--font-sans);
-    overflow-x: hidden;
     @apply bg-background text-foreground antialiased;
-  }
-
-  ::selection {
-    background: hsl(330 100% 64% / 0.25);
   }
 }
 
 @layer utilities {
-  .text-gradient {
-    background: var(--gradient-text);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .glass {
+    @apply bg-zinc-950/80 backdrop-blur-md border-b border-white/10;
   }
 
-  .glass {
-    background: hsl(280 18% 5% / 0.75);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+  .glass-card {
+    @apply bg-zinc-900/50 backdrop-blur-sm border border-white/10 shadow-xl;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-indigo-400;
+  }
+
+  .bg-hero {
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(124, 58, 237, 0.15), transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.15), transparent 40%);
   }
 }

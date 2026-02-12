@@ -1,73 +1,66 @@
-# Welcome to your Lovable project
+# VOX AI — Enterprise Voice Agent Platform
 
-## Project info
+VOX AI is a full-stack platform for building, deploying, and managing AI-powered voice agents. Businesses can create customized voice assistants that handle support, sales, and operations calls 24/7.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- **Voice Agent Studio** — Configure LLM, voice, transcriber, and advanced settings
+- **Onboarding Wizard** — Step-by-step setup that generates custom system prompts
+- **Voice Playground** — Test your assistant in-browser with live voice interaction
+- **Phone Number Management** — Import numbers and manage inbound/outbound call flows
+- **Business Integration** — Embed code, API keys, and widget for any website
+- **Multi-Provider Support** — ElevenLabs, OpenAI TTS, Deepgram, and more
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+| Layer      | Tech                                      |
+| ---------- | ----------------------------------------- |
+| Frontend   | React · TypeScript · Tailwind CSS · Vite  |
+| Backend    | Node.js · Express · MongoDB · JWT Auth    |
+| Voice      | ElevenLabs · Web Speech API               |
+| AI Models  | GPT-4o · Claude 3.5 · Gemini · Llama     |
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+```bash
+# Install dependencies
+npm install
 
-**Use your preferred IDE**
+# Start the backend server
+node server/index.js
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the frontend dev server (in a separate terminal)
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The frontend runs on `http://localhost:8080` and the backend on `http://localhost:5000`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Environment Variables
 
-**Use GitHub Codespaces**
+Create a `.env` file in the project root:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017/voxai
+SERVER_PORT=5000
+JWT_SECRET=your-secret-key
+VITE_API_URL=/api
+```
 
-## What technologies are used for this project?
+## Project Structure
 
-This project is built with:
+```
+├── server/            # Express backend (auth, assistants, voice-chat)
+│   ├── models/        # Mongoose schemas
+│   └── routes/        # API route handlers
+├── src/
+│   ├── components/    # Reusable UI components
+│   ├── pages/         # Page-level components (Auth, Studio, PhoneNumbers)
+│   ├── integrations/  # API client layer
+│   └── hooks/         # Custom React hooks
+├── public/            # Static assets
+└── index.html         # Entry HTML
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## License
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Proprietary — © 2026 VOX AI Enterprise Solutions.

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { auth, assistants as assistantsApi } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Mic, Plus, Trash2, Phone, LogOut, ArrowLeft, PhoneCall,
-  PhoneIncoming, PhoneOutgoing, Settings, Copy, Check, X, Search
+  PhoneIncoming, PhoneOutgoing, Settings, Copy, Check, X, Search, AudioWaveform
 } from "lucide-react";
 import voxaiLogo from "@/assets/voxai-logo.png";
 
@@ -122,13 +122,13 @@ export default function PhoneNumbers() {
   const providerConfig = PROVIDERS.find((p) => p.value === importProvider);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    auth.getSession().then(({ session }) => {
       setSessionChecked(true);
-      if (!data.session) navigate("/auth", { replace: true });
+      if (!session) navigate("/auth", { replace: true });
       else {
-        supabase.from("voice_assistants").select("id, name").then(({ data: rows }) => {
-          setAssistants((rows ?? []) as VoiceAssistant[]);
-        });
+        assistantsApi.list().then((rows: any[]) => {
+          setAssistants((rows ?? []).map((r: any) => ({ id: r._id || r.id, name: r.name })));
+        }).catch(() => { });
       }
     });
   }, [navigate]);
@@ -202,7 +202,7 @@ export default function PhoneNumbers() {
   }, [selectedNumber, outboundTo, outboundAssistant, assistants, toast]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
     navigate("/", { replace: true });
   }, [navigate]);
 
@@ -228,9 +228,11 @@ export default function PhoneNumbers() {
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-border/40 glass">
         <div className="flex h-12 items-center justify-between px-4">
-          <Link to="/app" className="flex items-center gap-2 font-display text-sm font-bold tracking-tight">
-            <img src={voxaiLogo} alt="VOXAI" className="h-7 w-7 rounded-lg" />
-            VOXAI
+          <Link to="/app" className="flex items-center gap-2 font-display text-xl font-bold tracking-tight text-foreground/90 hover:text-primary transition-colors">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-violet-600 text-white shadow-lg shadow-primary/20">
+              <AudioWaveform className="h-5 w-5" />
+            </div>
+            VOXAI <span className="text-primary">Numbers</span>
           </Link>
           <div className="flex items-center gap-1.5">
             <Button variant="ghost" size="sm" asChild><Link to="/app"><ArrowLeft className="h-3.5 w-3.5" /> Studio</Link></Button>
@@ -241,10 +243,10 @@ export default function PhoneNumbers() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left panel: Number list */}
-        <aside className="w-80 shrink-0 border-r border-border/40 bg-card/50 flex flex-col">
-          <div className="border-b border-border/30 p-3 space-y-2">
+        <aside className="w-80 shrink-0 border-r border-sidebar-border bg-sidebar flex flex-col">
+          <div className="border-b border-sidebar-border p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <p className="font-display text-xs font-semibold tracking-wide text-muted-foreground uppercase">Phone Numbers</p>
+              <p className="font-display text-xs font-semibold tracking-wide text-sidebar-foreground/70 uppercase">Phone Numbers</p>
               <Dialog open={importOpen} onOpenChange={setImportOpen}>
                 <DialogTrigger asChild>
                   <Button variant="hero" size="sm"><Plus className="h-3 w-3" /> Import</Button>
@@ -302,7 +304,7 @@ export default function PhoneNumbers() {
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search numbers…" className="h-8 pl-8 text-xs" />
+              <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search numbers…" className="h-8 pl-8 text-xs bg-sidebar-accent/50 border-sidebar-border text-sidebar-foreground" />
             </div>
           </div>
 
@@ -312,31 +314,32 @@ export default function PhoneNumbers() {
                 <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-secondary">
                   <Phone className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <p className="font-display text-xs font-semibold">No numbers yet</p>
+                <p className="font-display text-xs font-semibold text-sidebar-foreground">No numbers yet</p>
                 <p className="mt-1 text-[10px] text-muted-foreground">Import from Twilio, Vonage, or others.</p>
               </div>
             ) : (
               <div className="grid gap-1">
                 {filteredNumbers.map((n) => (
                   <button key={n.id} onClick={() => setSelectedId(n.id)}
-                    className={`w-full rounded-lg px-3 py-2.5 text-left transition ${n.id === selectedId ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary/60"}`}>
+                    className={`group relative w-full rounded-xl px-4 py-3 text-left transition-all hover:bg-sidebar-accent/50 hover:shadow-sm ${n.id === selectedId ? "bg-sidebar-accent shadow-md ring-1 ring-sidebar-ring/20" : "text-sidebar-foreground/70 hover:text-sidebar-foreground"}`}>
+                    {n.id === selectedId && <div className="absolute left-0 top-3 bottom-3 w-1 bg-primary rounded-r-full" />}
                     <div className="flex items-center justify-between">
-                      <p className="font-mono text-xs font-medium">{n.number}</p>
+                      <p className={`font-mono text-xs font-semibold transition-colors ${n.id === selectedId ? "text-primary" : "text-sidebar-foreground group-hover:text-primary"}`}>{n.number}</p>
                       <Badge variant={n.status === "active" ? "default" : "secondary"} className="text-[9px] px-1.5 py-0">
                         {n.status}
                       </Badge>
                     </div>
-                    <div className="mt-0.5 flex items-center gap-1.5">
-                      <span className="text-[10px] capitalize">{n.provider}</span>
-                      <span className="text-[10px]">·</span>
-                      <span className="text-[10px] truncate">{n.label}</span>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <span className="text-[10px] capitalize font-medium">{n.provider}</span>
+                      <span className="text-[10px] text-muted-foreground/40">·</span>
+                      <span className="text-[10px] truncate text-muted-foreground">{n.label}</span>
                     </div>
-                    <div className="mt-1 flex gap-1">
+                    <div className="mt-2 flex gap-1.5">
                       {n.inboundEnabled && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] text-primary/70"><PhoneIncoming className="h-2.5 w-2.5" /> In</span>
+                        <span className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 bg-primary/10 text-[9px] font-medium text-primary"><PhoneIncoming className="h-2.5 w-2.5" /> In</span>
                       )}
                       {n.outboundEnabled && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] text-accent/70"><PhoneOutgoing className="h-2.5 w-2.5" /> Out</span>
+                        <span className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 bg-violet-500/10 text-[9px] font-medium text-violet-400"><PhoneOutgoing className="h-2.5 w-2.5" /> Out</span>
                       )}
                     </div>
                   </button>

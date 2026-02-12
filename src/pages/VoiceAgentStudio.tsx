@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { supabase } from "@/integrations/supabase/client";
+import { auth, assistants as assistantsApi } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 
 import { VoicePlayground } from "@/components/voice/VoicePlayground";
-import { Mic, Plus, Save, LogOut, Sparkles, Trash2, Brain, AudioWaveform, Languages, Wrench, Volume2, Phone } from "lucide-react";
+import { Mic, Plus, Save, LogOut, Sparkles, Trash2, Brain, AudioWaveform, Languages, Wrench, Volume2, Phone, Code, Copy, Check, ChevronRight } from "lucide-react";
 import voxaiLogo from "@/assets/voxai-logo.png";
 
 type VoiceAssistantRow = {
@@ -115,11 +115,21 @@ const FUNCTIONS = [
 export default function VoiceAgentStudio() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [assistants, setAssistants] = useState<VoiceAssistantRow[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Partial<VoiceAssistantRow>>(defaultAssistantDraft());
   const [loading, setLoading] = useState(false);
   const [builderTab, setBuilderTab] = useState("model");
+
+  // Onboarding Wizard State
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardData, setWizardData] = useState({
+    name: "",
+    businessType: "",
+    requirements: "",
+  });
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -131,12 +141,26 @@ export default function VoiceAgentStudio() {
     setDraft((p) => ({ ...p, tools: { ...(p.tools ?? {}), [key]: val } }));
   }, []);
 
-  const load = useCallback(async (uid: string) => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from("voice_assistants").select("*").order("updated_at", { ascending: false });
-      if (error) throw error;
-      const rows = (data ?? []) as unknown as VoiceAssistantRow[];
+      const data = await assistantsApi.list();
+      const rows = (data ?? []).map((r: any) => ({
+        id: r._id || r.id,
+        user_id: r.userId,
+        name: r.name,
+        description: r.description ?? null,
+        system_prompt: r.systemPrompt ?? '',
+        language: r.language ?? 'en',
+        conversation_mode: r.conversationMode ?? 'friendly',
+        temperature: r.temperature ?? 0.7,
+        voice_provider: r.voiceProvider ?? 'elevenlabs',
+        voice_id: r.voiceId ?? null,
+        voice_speed: r.voiceSpeed ?? 1.0,
+        tools: r.tools ?? {},
+        created_at: r.createdAt,
+        updated_at: r.updatedAt,
+      })) as VoiceAssistantRow[];
       setAssistants(rows);
       if (rows[0] && !activeId) setActiveId(rows[0].id);
     } catch (e: unknown) {
@@ -147,19 +171,14 @@ export default function VoiceAgentStudio() {
   }, [toast, activeId]);
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user.id ?? null);
+    auth.getSession().then(({ session }) => {
+      const u = session?.user ?? null;
+      setUser(u);
+      setUserId(u?.id ?? null);
       setSessionChecked(true);
-      if (!session) navigate("/auth", { replace: true });
+      if (!u?.id) navigate("/auth", { replace: true });
+      else load();
     });
-    supabase.auth.getSession().then(({ data }) => {
-      const uid = data.session?.user?.id ?? null;
-      setUserId(uid);
-      setSessionChecked(true);
-      if (!uid) navigate("/auth", { replace: true });
-      else load(uid);
-    });
-    return () => data.subscription.unsubscribe();
   }, [navigate, load]);
 
   useEffect(() => {
@@ -167,31 +186,70 @@ export default function VoiceAgentStudio() {
     setDraft({ ...activeAssistant, tools: activeAssistant.tools ?? defaultAssistantDraft().tools });
   }, [activeAssistant]);
 
-  const createAssistant = useCallback(async () => {
+  const handleWizardSubmit = async () => {
     if (!userId) return;
     setLoading(true);
     try {
-      const payload = { user_id: userId, ...defaultAssistantDraft(), name: `Assistant ${assistants.length + 1}` };
-      const { data, error } = await supabase.from("voice_assistants").insert(payload).select("*").maybeSingle();
-      if (error) throw error;
-      if (!data) throw new Error("No data");
-      const row = data as unknown as VoiceAssistantRow;
+      // Generate system prompt based on inputs
+      const generatedPrompt = `You are a professional voice assistant for ${wizardData.businessType || "a business"} named ${wizardData.name}.
+Your primary goal is to: ${wizardData.requirements}.
+
+Guidelines:
+- Speak clearly and concisely.
+- Be polite and professional at all times.
+- Ask clarifying questions if the user's request is ambiguous.
+- If you don't know the answer, politely offer to transfer the call to a human agent.
+- Keep responses short (under 2-3 sentences) to maintain a natural conversation flow.`;
+
+      const defaults = defaultAssistantDraft();
+      const data = await assistantsApi.create({
+        name: wizardData.name || `Assistant ${assistants.length + 1}`,
+        description: `${wizardData.businessType} Assistant`,
+        systemPrompt: generatedPrompt,
+        language: defaults.language,
+        conversationMode: defaults.conversation_mode,
+        temperature: defaults.temperature,
+        voiceProvider: defaults.voice_provider,
+        voiceId: defaults.voice_id,
+        voiceSpeed: defaults.voice_speed,
+        tools: defaults.tools,
+      });
+
+      const row: VoiceAssistantRow = {
+        id: data._id || data.id,
+        user_id: data.userId,
+        name: data.name,
+        description: data.description ?? null,
+        system_prompt: data.systemPrompt ?? '',
+        language: data.language ?? 'en',
+        conversation_mode: data.conversationMode ?? 'friendly',
+        temperature: data.temperature ?? 0.7,
+        voice_provider: data.voiceProvider ?? 'elevenlabs',
+        voice_id: data.voiceId ?? null,
+        voice_speed: data.voiceSpeed ?? 1.0,
+        tools: data.tools ?? {},
+        created_at: data.createdAt,
+        updated_at: data.updatedAt,
+      };
+
       setAssistants((p) => [row, ...p]);
       setActiveId(row.id);
-      toast({ title: "Created" });
+      toast({ title: "Assistant Created", description: `"${row.name}" has been configured.` });
+      setWizardOpen(false);
+      setWizardStep(1);
+      setWizardData({ name: "", businessType: "", requirements: "" });
     } catch (e: unknown) {
       toast({ variant: "destructive", title: "Error", description: e instanceof Error ? e.message : "Failed" });
     } finally {
       setLoading(false);
     }
-  }, [userId, assistants.length, toast]);
+  };
 
   const deleteAssistant = useCallback(async () => {
     if (!activeId) return;
     setLoading(true);
     try {
-      const { error } = await supabase.from("voice_assistants").delete().eq("id", activeId);
-      if (error) throw error;
+      await assistantsApi.remove(activeId);
       setAssistants((p) => p.filter((a) => a.id !== activeId));
       setActiveId(null);
       toast({ title: "Deleted" });
@@ -206,30 +264,29 @@ export default function VoiceAgentStudio() {
     if (!activeId) return;
     setLoading(true);
     try {
-      const { error } = await supabase.from("voice_assistants").update({
+      await assistantsApi.update(activeId, {
         name: draft.name ?? "Untitled",
         description: draft.description ?? null,
-        system_prompt: draft.system_prompt ?? "",
+        systemPrompt: draft.system_prompt ?? "",
         language: draft.language ?? "en",
-        conversation_mode: draft.conversation_mode ?? "neutral",
+        conversationMode: draft.conversation_mode ?? "neutral",
         temperature: Number(draft.temperature ?? 0.7),
-        voice_provider: draft.voice_provider ?? "elevenlabs",
-        voice_id: draft.voice_id ?? null,
-        voice_speed: Number(draft.voice_speed ?? 1.0),
+        voiceProvider: draft.voice_provider ?? "elevenlabs",
+        voiceId: draft.voice_id ?? null,
+        voiceSpeed: Number(draft.voice_speed ?? 1.0),
         tools: draft.tools ?? {},
-      }).eq("id", activeId);
-      if (error) throw error;
+      });
       toast({ title: "Saved" });
-      if (userId) await load(userId);
+      await load();
     } catch (e: unknown) {
       toast({ variant: "destructive", title: "Error", description: e instanceof Error ? e.message : "Failed" });
     } finally {
       setLoading(false);
     }
-  }, [activeId, draft, toast, userId, load]);
+  }, [activeId, draft, toast, load]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
     navigate("/", { replace: true });
   }, [navigate]);
 
@@ -246,13 +303,15 @@ export default function VoiceAgentStudio() {
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-border/40 glass">
         <div className="flex h-12 items-center justify-between px-4">
-          <Link to="/" className="flex items-center gap-2 font-display text-sm font-bold tracking-tight">
-            <img src={voxaiLogo} alt="VOXAI" className="h-7 w-7 rounded-lg" />
-            VOXAI Studio
+          <Link to="/" className="flex items-center gap-2 font-display text-xl font-bold tracking-tight text-foreground/90 hover:text-primary transition-colors">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-violet-600 text-white shadow-lg shadow-primary/20">
+              <AudioWaveform className="h-5 w-5" />
+            </div>
+            VOXAI <span className="text-primary">Studio</span>
           </Link>
           <div className="flex items-center gap-1.5">
             <Button variant="ghost" size="sm" asChild><Link to="/phone-numbers"><Phone className="h-3.5 w-3.5" /> Numbers</Link></Button>
-            <Button variant="ghost" size="sm" onClick={createAssistant} disabled={loading}><Plus className="h-3.5 w-3.5" /> New</Button>
+            <Button variant="ghost" size="sm" onClick={() => setWizardOpen(true)} disabled={loading}><Plus className="h-3.5 w-3.5" /> New</Button>
             <Button variant="hero" size="sm" onClick={saveAssistant} disabled={loading || !activeId}><Save className="h-3.5 w-3.5" /> Save</Button>
             <Button variant="ghost" size="sm" onClick={signOut}><LogOut className="h-3.5 w-3.5" /></Button>
           </div>
@@ -262,21 +321,25 @@ export default function VoiceAgentStudio() {
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar: assistant list */}
-        <aside className="hidden w-64 shrink-0 border-r border-border/40 bg-card/50 lg:block">
+        <aside className="hidden w-64 shrink-0 border-r border-sidebar-border bg-sidebar lg:block">
           <div className="flex h-full flex-col">
-            <div className="border-b border-border/30 px-4 py-3">
-              <p className="font-display text-xs font-semibold tracking-wide text-muted-foreground uppercase">Assistants</p>
+            <div className="border-b border-sidebar-border px-4 py-3">
+              <p className="font-display text-xs font-semibold tracking-wide text-sidebar-foreground/70 uppercase">Assistants</p>
             </div>
             <div className="flex-1 overflow-y-auto p-2">
               {assistants.length === 0 ? (
-                <p className="px-2 py-4 text-xs text-muted-foreground">No assistants yet.</p>
+                <p className="px-2 py-4 text-xs text-sidebar-foreground/50">No assistants yet.</p>
               ) : (
                 <div className="grid gap-1">
                   {assistants.map((a) => (
                     <button key={a.id} onClick={() => setActiveId(a.id)}
-                      className={`w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-secondary/60 ${a.id === activeId ? "bg-secondary text-secondary-foreground" : "text-muted-foreground"}`}>
-                      <p className="font-display text-xs font-medium truncate">{a.name}</p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground truncate">{a.conversation_mode} · {a.language}</p>
+                      className={`group relative flex w-full flex-col gap-1 rounded-xl px-4 py-3 text-left transition-all hover:bg-sidebar-accent/50 ${a.id === activeId ? "bg-sidebar-accent shadow-sm ring-1 ring-sidebar-ring/20" : "text-sidebar-foreground/70 hover:text-sidebar-foreground"}`}>
+                      {a.id === activeId && <div className="absolute left-0 top-3 bottom-3 w-1 bg-primary rounded-r-full" />}
+                      <div className="flex items-center justify-between">
+                        <p className={`font-display text-sm font-semibold transition-colors ${a.id === activeId ? "text-primary" : "text-sidebar-foreground group-hover:text-primary"}`}>{a.name}</p>
+                        {a.id === activeId && <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(124,58,237,0.5)]" />}
+                      </div>
+                      <p className="line-clamp-1 text-[10px] text-muted-foreground/80 font-medium tracking-wide uppercase">{a.conversation_mode} · {a.language}</p>
                     </button>
                   ))}
                 </div>
@@ -292,7 +355,7 @@ export default function VoiceAgentStudio() {
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">Select or create an assistant to get started.</p>
-                  <Button variant="hero" size="sm" className="mt-3" onClick={createAssistant} disabled={loading}>
+                  <Button variant="hero" size="sm" className="mt-3" onClick={() => setWizardOpen(true)} disabled={loading}>
                     <Plus className="h-3.5 w-3.5" /> Create Assistant
                   </Button>
                 </div>
@@ -316,13 +379,74 @@ export default function VoiceAgentStudio() {
 
                 {/* Tabbed builder — Vapi style */}
                 <Tabs value={builderTab} onValueChange={setBuilderTab}>
-                  <TabsList className="mb-4 grid w-full grid-cols-5">
-                    <TabsTrigger value="model" className="gap-1.5 text-xs"><Brain className="h-3 w-3" /> Model</TabsTrigger>
-                    <TabsTrigger value="voice" className="gap-1.5 text-xs"><AudioWaveform className="h-3 w-3" /> Voice</TabsTrigger>
-                    <TabsTrigger value="transcriber" className="gap-1.5 text-xs"><Languages className="h-3 w-3" /> Transcriber</TabsTrigger>
-                    <TabsTrigger value="functions" className="gap-1.5 text-xs"><Wrench className="h-3 w-3" /> Functions</TabsTrigger>
-                    <TabsTrigger value="advanced" className="gap-1.5 text-xs"><Sparkles className="h-3 w-3" /> Advanced</TabsTrigger>
+                  <TabsList className="mb-6 inline-flex h-9 items-center justify-start rounded-none border-b border-border/40 bg-transparent p-0 w-full gap-6">
+                    <TabsTrigger value="model" className="rounded-none border-b-2 border-transparent px-2 pb-2 pt-1.5 font-semibold text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent hover:text-primary/80 transition-all">Model</TabsTrigger>
+                    <TabsTrigger value="voice" className="rounded-none border-b-2 border-transparent px-2 pb-2 pt-1.5 font-semibold text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent hover:text-primary/80 transition-all">Voice</TabsTrigger>
+                    <TabsTrigger value="transcriber" className="rounded-none border-b-2 border-transparent px-2 pb-2 pt-1.5 font-semibold text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent hover:text-primary/80 transition-all">Transcriber</TabsTrigger>
+                    <TabsTrigger value="functions" className="rounded-none border-b-2 border-transparent px-2 pb-2 pt-1.5 font-semibold text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent hover:text-primary/80 transition-all">Functions</TabsTrigger>
+                    <TabsTrigger value="advanced" className="rounded-none border-b-2 border-transparent px-2 pb-2 pt-1.5 font-semibold text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent hover:text-primary/80 transition-all">Advanced</TabsTrigger>
+                    <TabsTrigger value="integration" className="rounded-none border-b-2 border-transparent px-2 pb-2 pt-1.5 font-semibold text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-none bg-transparent hover:text-primary/80 transition-all">Integration</TabsTrigger>
                   </TabsList>
+
+                  {/* INTEGRATION TAB */}
+                  <TabsContent value="integration" className="space-y-4">
+                    <Card className="border-border/40 bg-card shadow-card">
+                      <CardHeader className="pb-3 bg-secondary/5 border-b border-border/40">
+                        <CardTitle className="font-display text-sm flex items-center gap-2"><Code className="h-4 w-4 text-primary" /> Business Integration</CardTitle>
+                        <CardDescription className="text-xs">Copy these credentials to deploy this assistant on your website.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-5 pt-5">
+                        <div className="grid gap-2">
+                          <Label className="text-xs font-semibold uppercase text-muted-foreground">Assistant ID</Label>
+                          <div className="flex gap-2">
+                            <Input readOnly value={activeId || ""} className="bg-muted font-mono text-xs" />
+                            <Button variant="outline" size="icon" onClick={() => { navigator.clipboard.writeText(activeId || ""); toast({ title: "Copied!" }); }}>
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Unique identifier for this assistant configuration.</p>
+                        </div>
+
+                        <Separator />
+
+                        <div className="grid gap-2">
+                          <Label className="text-xs font-semibold uppercase text-muted-foreground">Web Embed Code</Label>
+                          <div className="rounded-lg border bg-slate-950 p-3 relative group">
+                            <pre className="text-[10px] text-slate-300 overflow-x-auto whitespace-pre-wrap font-mono">
+                              {`<script src="https://cdn.voxai.com/widget.js"></script>
+<script>
+  VoxAI.init({
+    assistantId: "${activeId}",
+    apiKey: "${user?.publicKey || 'YOUR_PUBLIC_KEY'}",
+    position: "bottom-right"
+  });
+</script>`}
+                            </pre>
+                            <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 text-white hover:bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { navigator.clipboard.writeText(`<script src="https://cdn.voxai.com/widget.js"></script>\n<script>\n  VoxAI.init({\n    assistantId: "${activeId}",\n    apiKey: "${user?.publicKey || 'YOUR_PUBLIC_KEY'}",\n    position: "bottom-right"\n  });\n</script>`); toast({ title: "Copied!" }); }}>
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Place this code in your website's &lt;body&gt; tag.</p>
+                        </div>
+
+                        <Separator />
+
+                        <div className="grid gap-2">
+                          <Label className="text-xs font-semibold uppercase text-muted-foreground">API Usage</Label>
+                          <div className="rounded-lg border bg-muted p-3">
+                            <p className="text-xs text-muted-foreground">
+                              You can also trigger calls programmatically:
+                            </p>
+                            <code className="mt-2 block rounded bg-background p-2 text-[10px] font-mono border">
+                              POST https://api.voxai.com/v1/call<br />
+                              Authorization: Bearer {user?.publicKey || "YOUR_PUBLIC_KEY"}<br />
+                              &#123; "assistantId": "{activeId}", "phone": "+919876543210" &#125;
+                            </code>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
 
                   {/* MODEL TAB */}
                   <TabsContent value="model" className="space-y-4">
@@ -512,25 +636,85 @@ export default function VoiceAgentStudio() {
           </section>
 
           {/* Voice playground sidebar */}
-          <aside className="w-full shrink-0 overflow-y-auto border-t border-border/30 p-4 lg:w-80 lg:border-t-0 lg:p-4">
+          <aside className="w-full shrink-0 overflow-y-auto border-t border-sidebar-border bg-sidebar p-4 lg:w-80 lg:border-t-0 lg:border-l lg:p-4">
             <VoicePlayground
               assistant={
                 activeAssistant
                   ? {
-                      name: activeAssistant.name,
-                      systemPrompt: activeAssistant.system_prompt,
-                      language: activeAssistant.language,
-                      conversationMode: activeAssistant.conversation_mode,
-                      temperature: activeAssistant.temperature,
-                      voiceId: activeAssistant.voice_id ?? undefined,
-                      voiceProvider: activeAssistant.voice_provider,
-                    }
+                    name: activeAssistant.name,
+                    systemPrompt: activeAssistant.system_prompt,
+                    language: activeAssistant.language,
+                    conversationMode: activeAssistant.conversation_mode,
+                    temperature: activeAssistant.temperature,
+                    voiceId: activeAssistant.voice_id ?? undefined,
+                    voiceProvider: activeAssistant.voice_provider,
+                  }
                   : null
               }
             />
           </aside>
         </main>
       </div>
+
+      {/* Onboarding Wizard Dialog */}
+      {wizardOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="mb-6 space-y-2 text-center">
+              <h2 className="text-2xl font-bold tracking-tight">Setup your Assistant</h2>
+              <p className="text-sm text-muted-foreground">This helps us customize the AI for your business.</p>
+            </div>
+
+            <div className="space-y-4">
+              {wizardStep === 1 && (
+                <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                  <div className="space-y-2">
+                    <Label>Assistant Name</Label>
+                    <Input autoFocus placeholder="e.g. Sarah" value={wizardData.name} onChange={(e) => setWizardData(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Business Type</Label>
+                    <Input placeholder="e.g. Dental Clinic, Real Estate" value={wizardData.businessType} onChange={(e) => setWizardData(p => ({ ...p, businessType: e.target.value }))} />
+                  </div>
+                </div>
+              )}
+
+              {wizardStep === 2 && (
+                <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                  <div className="space-y-2">
+                    <Label>What should this assistant do?</Label>
+                    <CardDescription className="mb-2">Explain its goal, e.g. "Book appointments and answer FAQs about pricing."</CardDescription>
+                    <Textarea
+                      placeholder="e.g. Answer calls, screen leads, and book meetings on the calendar."
+                      className="min-h-[120px]"
+                      value={wizardData.requirements}
+                      onChange={(e) => setWizardData(p => ({ ...p, requirements: e.target.value }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-8 flex justify-between pt-4 border-t border-border/50">
+                {wizardStep === 1 ? (
+                  <Button variant="ghost" onClick={() => setWizardOpen(false)}>Cancel</Button>
+                ) : (
+                  <Button variant="ghost" onClick={() => setWizardStep(1)}>Back</Button>
+                )}
+
+                {wizardStep === 1 ? (
+                  <Button onClick={() => setWizardStep(2)} disabled={!wizardData.name || !wizardData.businessType}>
+                    Next <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button onClick={handleWizardSubmit} disabled={!wizardData.requirements || loading}>
+                    {loading ? "Creating..." : "Create Assistant"} <Sparkles className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

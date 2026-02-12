@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, MicOff, Phone, PhoneOff, Sparkles, Volume2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { voiceChat } from "@/integrations/supabase/client";
 
 export type PlaygroundAssistant = {
   name: string;
@@ -76,19 +76,16 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
     setMessages(newMessages);
 
     try {
-      const { data, error } = await supabase.functions.invoke("voice-chat", {
-        body: {
-          userMessage: userText,
-          systemPrompt: assistant?.systemPrompt ?? "You are a helpful voice assistant.",
-          temperature: assistant?.temperature ?? 0.7,
-          conversationHistory: newMessages.slice(-6).map((m) => ({
-            role: m.role,
-            content: m.text,
-          })),
-        },
+      const data = await voiceChat.invoke({
+        userMessage: userText,
+        systemPrompt: assistant?.systemPrompt ?? "You are a helpful voice assistant.",
+        temperature: assistant?.temperature ?? 0.7,
+        conversationHistory: newMessages.slice(-6).map((m) => ({
+          role: m.role,
+          content: m.text,
+        })),
       });
 
-      if (error) throw error;
       const reply = data?.reply ?? "Sorry, I couldn't process that.";
       setMessages((prev) => [...prev, { role: "assistant", text: reply }]);
       speak(reply);
@@ -196,9 +193,9 @@ export function VoicePlayground({ assistant }: { assistant: PlaygroundAssistant 
           >
             <div className={`grid h-10 w-10 place-items-center rounded-xl shadow-glow transition-colors ${isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
               {status === "listening" ? <Mic className="h-5 w-5 animate-pulse" /> :
-               status === "speaking" ? <Sparkles className="h-5 w-5" /> :
-               status === "thinking" ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" /> :
-               <Phone className="h-5 w-5" />}
+                status === "speaking" ? <Sparkles className="h-5 w-5" /> :
+                  status === "thinking" ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" /> :
+                    <Phone className="h-5 w-5" />}
             </div>
           </motion.div>
         </div>
