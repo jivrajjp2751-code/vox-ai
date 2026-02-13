@@ -16,7 +16,10 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
         ...options.headers,
     };
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const baseUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+    const url = endpoint.startsWith('/') ? `${baseUrl}${endpoint}` : `${baseUrl}/${endpoint}`;
+
+    const response = await fetch(url, {
         ...options,
         headers,
     });
