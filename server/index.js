@@ -78,7 +78,8 @@ app.use((err, req, res, next) => {
 
 // Connect to MongoDB asynchronously
 try {
-    console.log('Connecting to MongoDB...');
+    const maskedURI = MONGO_URI.replace(/:([^:@]+)@/, ':****@');
+    console.log(`Connecting to MongoDB at: ${maskedURI}`);
     mongoose
         .connect(MONGO_URI)
         .then(() => console.log('✅ Connected to MongoDB'))
