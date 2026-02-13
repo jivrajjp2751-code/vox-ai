@@ -81,7 +81,7 @@ try {
     const maskedURI = MONGO_URI.replace(/:([^:@]+)@/, ':****@');
     console.log(`Connecting to MongoDB at: ${maskedURI}`);
     mongoose
-        .connect(MONGO_URI)
+        .connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
         .then(() => console.log('✅ Connected to MongoDB'))
         .catch((err) => console.error('❌ MongoDB connection error:', err.message));
 } catch (dbError) {
